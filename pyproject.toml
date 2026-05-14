@@ -1,0 +1,55 @@
+[tool.ruff]
+# ---------------------------------------------------------------------
+# GENERAL CONFIGURATION
+# ---------------------------------------------------------------------
+
+target-version = "py310"
+line-length = 100
+
+# ---------------------------------------------------------------------
+# FILES / DIRECTORIES EXCLUDED FROM ANALYSIS
+# ---------------------------------------------------------------------
+exclude = [
+    # Ignore all test code completely
+    "tests/**",
+]
+
+
+# ---------------------------------------------------------------------
+# LINTING CONFIGURATION
+# ---------------------------------------------------------------------
+
+[tool.ruff.lint]
+
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (undefined names, unused imports, etc.)
+    "I",   # import sorting (isort)
+    "B",   # bugbear (likely bugs / anti-patterns)
+    "UP",  # pyupgrade (modern Python syntax)
+]
+
+ignore = [
+    "B008",  # function calls in default arguments
+    "E501",  # line length handled by formatter
+    "E701",  # multiple statements on one line
+    "E702",  # multiple statements with semicolon
+]
+
+
+# ---------------------------------------------------------------------
+# IMPORT SETTINGS
+# ---------------------------------------------------------------------
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+
+# ---------------------------------------------------------------------
+# FORMATTING SETTINGS
+# ---------------------------------------------------------------------
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

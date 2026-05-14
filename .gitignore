@@ -1,0 +1,69 @@
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.pyo
+*.pyd
+env/
+.venv/
+venv/
+.env
+pip-wheel-metadata/
+*.egg
+
+# ── Conda / entornos locales ─────────────────────────────────────────────
+miniconda3/
+anaconda3/
+*.conda
+
+# ── Datos y modelos grandes (no versionar) ──────────────────────────────
+/data/
+results/checkpoints/
+results/logs/
+wandb/
+
+# ── Mantener estructura de carpetas vacías ───────────────────────────────
+!data/**/.gitkeep
+!results/**/.gitkeep
+
+# ── Archivos temporales y logs ──────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+Thumbs.db
+
+# ── IDEs y editores ─────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+.ruff_cache/
+
+# ── Notebooks ──────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── PyTorch / TensorFlow / ML artifacts ─────────────────────────────────
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.tflite
+*.onnx
+*.npz
+
+# ── Otros resultados de experimentos ────────────────────────────────────
+results/plots/
+results/summary/
+*.png
+
+# ── Override global gitignore  ──────────────────────────────────────────
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.blg
+*.bbl

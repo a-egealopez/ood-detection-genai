@@ -1,0 +1,12 @@
+# In-distribution:     MNIST
+# Out-of-distribution: SVHN
+
+data:
+  dataset: mnist
+  root: data/
+  input_dim: 784    # 28×28 aplanado
+  n_train_samples: 10000
+  n_eval_samples: 2000
+  num_workers: 0
+  pin_memory: false
+  ood_label: 10

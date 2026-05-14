@@ -1,0 +1,22 @@
+experiment_name: vae
+
+model:
+  model_type: vae
+  latent_dim: 32
+
+training:
+  epochs: 100
+  lr: 1.0e-4
+  scheduler: cosine
+  warmup_epochs: 25
+  kl_weight: 1.0e-3
+  kl_warmup_epochs: 30
+
+ood:
+  primary_score: elbo
+  residual_components: 8
+  knn_k: 5
+
+wandb:
+  tags: [ood, vae]
+  save_code: false

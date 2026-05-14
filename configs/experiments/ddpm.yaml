@@ -1,0 +1,33 @@
+experiment_name: ddpm
+
+model:
+  model_type: ddpm
+  hidden_dim: 1024
+  depth: 8
+  time_emb_dim: 512
+  dropout: 0.0
+  num_train_timesteps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  prediction_type: epsilon
+  n_score_steps: 10
+  recon_timestep: 250
+
+training:
+  lr: 1.0e-4
+  epochs: 300
+  optimizer: adamw
+  scheduler: cosine
+  warmup_epochs: 30
+  use_ema: true
+  early_stopping: true
+  early_stopping_patience: 50
+
+ood:
+  primary_score: recon
+  residual_components: 8
+  knn_k: 1
+
+wandb:
+  tags: [ood, ddpm]
+  save_code: false
