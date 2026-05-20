@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +16,9 @@ from sklearn.preprocessing import StandardScaler
 
 import wandb
 from src.artifacts import save_figure
-from src.evaluation.extract import ScoreBundle
+
+if TYPE_CHECKING:
+    from src.evaluation.extract import ScoreBundle
 
 
 def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) -> None:
@@ -65,44 +70,14 @@ def _plot_roc_curve(
     ax.grid(True, alpha=0.3)
 
 
-def _plot_per_class_boxplot(
-    id_scores: np.ndarray, id_labels: np.ndarray, ood_scores: np.ndarray, mode: str
-) -> plt.Figure:
-    classes = sorted(np.unique(id_labels).tolist())
-    id_mu, id_std = id_scores.mean(), id_scores.std()
-    ood_mu, ood_std = ood_scores.mean(), ood_scores.std()
-
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.boxplot(
-        [id_scores[id_labels == c] for c in classes],
-        labels=[str(c) for c in classes],
-        patch_artist=True,
-        boxprops=dict(facecolor="steelblue", alpha=0.6),
-        medianprops=dict(color="navy", linewidth=2),
-        showfliers=False,
-    )
-    ax.axhline(id_mu, color="green", lw=1.5, ls="-.", label=f"ID mean = {id_mu:.5f}")
-    ax.axhspan(id_mu - id_std, id_mu + id_std, color="green", alpha=0.10, label="ID ±1σ")
-    ax.axhline(ood_mu, color="tomato", lw=2, ls="--", label=f"OOD mean = {ood_mu:.5f}")
-    ax.axhspan(ood_mu - ood_std, ood_mu + ood_std, color="tomato", alpha=0.15, label="OOD ±1σ")
-    ax.set_title(f"Per-Class Score [{mode}]", fontsize=12, fontweight="bold")
-    ax.set_xlabel("Digit class")
-    ax.set_ylabel("Score")
-    ax.legend()
-    ax.grid(True, axis="y", alpha=0.3)
-    plt.tight_layout()
-    return fig
-
-
 def plot_ood_evaluation(
     scores: ScoreBundle,
-    id_labels: np.ndarray,
     aurocs: dict[str, float],
     active: list[tuple[str, str, str]],
     run=None,
-    boxplot_mode: str = "recon",
+    plots_dir: Path | None = None,
 ) -> None:
-    """Render score distribution, ROC, and per-class boxplot figures."""
+    """Render score distribution and ROC figures for each pair of active scoring modes."""
 
     for i in range(0, len(active), 2):
         chunk = active[i : i + 2]
@@ -127,21 +102,12 @@ def plot_ood_evaluation(
                 axes[row, 1],
             )
         plt.tight_layout()
-        plt.show()
+        if plots_dir is not None:
+            plots_dir.mkdir(parents=True, exist_ok=True)
+            fig.savefig(plots_dir / f"ood_scores_{mode_names}.png", dpi=150, bbox_inches="tight")
         if run is not None:
-            run.log({f"eval/plots/ood/{mode_names}": wandb.Image(fig)})
+            run.log({f"eval/ood_scores/{mode_names}": wandb.Image(fig)})
         plt.close(fig)
-
-    id_scores = getattr(scores, f"id_{boxplot_mode}", np.array([]))
-    ood_scores = getattr(scores, f"ood_{boxplot_mode}", np.array([]))
-    if id_scores.size > 0 and ood_scores.size > 0:
-        fig_cls = _plot_per_class_boxplot(id_scores, id_labels, ood_scores, mode=boxplot_mode)
-        plt.show()
-        if run is not None:
-            run.log({"eval/plots/per_class_scores": wandb.Image(fig_cls)})
-        plt.close(fig_cls)
-    else:
-        print(f"  Skipping per-class boxplot: '{boxplot_mode}' has no scores.")
 
 
 def _standardize_scale(zs: np.ndarray) -> np.ndarray:
@@ -193,7 +159,7 @@ PROJECTOR_REGISTRY: dict[str, callable] = {
     "tsne": _project_tsne,
     "umap": _project_umap,
 }
-DEFAULT_PROJECTORS: list[str] = ["pca", "tsne", "umap"]
+DEFAULT_PROJECTORS: list[str] = ["pca", "umap"]
 
 
 def _scatter_panel(

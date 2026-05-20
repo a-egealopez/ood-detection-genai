@@ -36,7 +36,7 @@ def _build_mnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     root = cfg.data.root
 
     norm = transforms.Normalize((0.5,), (0.5,))
-    flat = transforms.Lambda(lambda x: x.view(1, -1))
+    flat = transforms.Lambda(lambda x: x.view(-1))
 
     id_tf = transforms.Compose([transforms.ToTensor(), norm, flat])
     ood_tf = transforms.Compose(
@@ -124,9 +124,51 @@ def _build_sicap_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     )
 
 
+def _build_toy_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
+    from sklearn.datasets import make_circles, make_moons
+
+    dataset_name = str(cfg.data.dataset)
+    n_samples = int(cfg.data.get("n_samples", 600))
+    noise = float(cfg.data.get("noise", 0.05))
+    seed = int(cfg.get("seed", 42))
+
+    if dataset_name == "moons":
+        X, y = make_moons(n_samples=n_samples, noise=noise, random_state=seed)
+    else:
+        factor = float(cfg.data.get("factor", 0.5))
+        X, y = make_circles(n_samples=n_samples, noise=noise, factor=factor, random_state=seed)
+
+    X = X.astype(np.float32)
+    X_id, y_id = X[y == 0], y[y == 0]
+    X_ood, y_ood = X[y == 1], y[y == 1]
+
+    n_train = int(len(X_id) * float(cfg.data.get("train_frac", 0.7)))
+    X_train, y_train = X_id[:n_train], y_id[:n_train]
+    X_id_eval, y_id_eval = X_id[n_train:], y_id[n_train:]
+
+    mean = X_train.mean(axis=0, keepdims=True)
+    std = X_train.std(axis=0, keepdims=True)
+    std = np.where(std < 1e-6, 1.0, std)
+
+    datasets = {
+        "train": _to_tensor_dataset(X_train, y_train, mean, std),
+        "id_eval": _to_tensor_dataset(X_id_eval, y_id_eval, mean, std),
+        "ood_eval": _to_tensor_dataset(X_ood, y_ood, mean, std),
+    }
+    return datasets, DataLoaderSpec(
+        id_name=f"{dataset_name}_id",
+        ood_name=f"{dataset_name}_ood",
+        input_dim=2,
+        is_image=False,
+    )
+
+
 _DATASET_BUILDERS = {
     "mnist": _build_mnist_dataset,
-    "sicap": _build_sicap_dataset,
+    "sicap_c1": _build_sicap_dataset,
+    "sicap_c12": _build_sicap_dataset,
+    "moons": _build_toy_dataset,
+    "circles": _build_toy_dataset,
 }
 
 

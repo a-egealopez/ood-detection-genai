@@ -47,7 +47,10 @@ def build_experiment_id(cfg) -> str:
     if cfg.method == "distance-method":
         return f"dist_{cfg.distance_type}_{cfg.data.dataset}_s{cfg.seed}"
 
-    return f"recon_{cfg.model.model_type}_{cfg.data.dataset}_s{cfg.seed}_lr{cfg.training.lr}_ep{cfg.training.epochs}"
+    base = f"{cfg.model.model_type}_{cfg.data.dataset}_s{cfg.seed}_lr{cfg.training.lr}"
+    if "ddpm" in str(cfg.model.get("model_type", "")):
+        base += f"_t{cfg.model.n_score_steps}"
+    return base
 
 
 def _slug(text: str) -> str:

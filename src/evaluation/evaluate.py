@@ -15,9 +15,13 @@ from .extract import ScoreBundle
 _ALL_MODES: list[tuple[str, str, str]] = [
     ("recon", "id_recon", "ood_recon"),
     ("elbo", "id_elbo", "ood_elbo"),
-    ("residual", "id_residual", "ood_residual"),
     ("knn", "id_knn", "ood_knn"),
-    ("noise", "id_noise", "ood_noise"),
+    ("mahalanobis", "id_mahalanobis", "ood_mahalanobis"),
+    ("noise_single", "id_noise_single", "ood_noise_single"),
+    ("noise_multi_mse", "id_noise_multi_mse", "ood_noise_multi_mse"),
+    ("noise_multi_cosine", "id_noise_multi_cosine", "ood_noise_multi_cosine"),
+    ("residual_mah", "id_residual_mah", "ood_residual_mah"),
+    ("residual_knn", "id_residual_knn", "ood_residual_knn"),
 ]
 
 
@@ -75,11 +79,11 @@ def _threshold_analysis(
     result: dict = {}
     for mode, id_attr, ood_attr in active:
         id_scores, ood_scores = getattr(scores, id_attr), getattr(scores, ood_attr)
-        tau = float(np.quantile(id_scores, 1.0 - fpr_target))
+        threshold = float(np.quantile(id_scores, 1.0 - fpr_target))
         result[mode] = {
-            "threshold": tau,
-            "fpr": float((id_scores > tau).mean()),
-            "tpr": float((ood_scores > tau).mean()),
+            "threshold": threshold,
+            "fpr": float((id_scores > threshold).mean()),
+            "tpr": float((ood_scores > threshold).mean()),
         }
     return result
 
@@ -98,11 +102,11 @@ def evaluate_ood(
     active = _active_modes(scores)
     metrics: dict[str, dict[str, float]] = {}
     for mode, id_attr, ood_attr in active:
-        m = compute_metrics(getattr(scores, id_attr), getattr(scores, ood_attr))
-        metrics[mode] = m
-        run.log({f"eval/{k}/{mode}": v for k, v in m.items()})
+        metrics_by_mode = compute_metrics(getattr(scores, id_attr), getattr(scores, ood_attr))
+        metrics[mode] = metrics_by_mode
+        run.log({f"eval/{k}/{mode}": v for k, v in metrics_by_mode.items()})
         print(
-            f"  [{mode:>8}]  AUROC={m['auroc']:.4f}  AUPR={m['aupr']:.4f}  FPR@95={m['fpr_at_95_tpr']:.4f}"
+            f"  [{mode:>8}]  AUROC={metrics_by_mode['auroc']:.4f}  AUPR={metrics_by_mode['aupr']:.4f}  FPR@95={metrics_by_mode['fpr_at_95_tpr']:.4f}"
         )
     thresholds = _threshold_analysis(scores, active, fpr_target)
     print(f"\n  Decision thresholds (FPR target = {fpr_target:.0%}):")
@@ -115,16 +119,18 @@ def evaluate_ood(
                 f"eval/fpr/{mode}": d["fpr"],
             }
         )
-    results = EvalResults(metrics=metrics, thresholds=thresholds)
     experiment_id = experiment_id or cfg.wandb.get("run_name", cfg.model.model_type)
-    out_path = (
-        Path(cfg.get("logs_dir", "results/logs"))
-        / cfg.model.model_type
-        / experiment_id
-        / "eval_results.json"
-    )
+    results = EvalResults(metrics=metrics, thresholds=thresholds)
+    payload = {
+        "method": str(cfg.model.model_type),
+        "dataset": str(cfg.data.dataset),
+        "seed": int(cfg.seed),
+        "lr": float(cfg.training.lr),
+        **results.to_dict(),
+    }
+    out_path = Path("results") / experiment_id / "eval_results.json"
     save_json(
-        payload=results.to_dict(),
+        payload=payload,
         out_path=out_path,
         run=run if cfg.wandb.enabled else None,
         artifact_type="evaluation",

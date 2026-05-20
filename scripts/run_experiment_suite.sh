@@ -17,15 +17,14 @@ RUN_RECONSTRUCTION="${RUN_RECONSTRUCTION:-1}"
 RUN_DISTANCE="${RUN_DISTANCE:-1}"
 SKIP_TRAIN="${SKIP_TRAIN:-0}"
 
-# Auto-selección de GPU libre
 export CUDA_VISIBLE_DEVICES=$(nvidia-smi --query-gpu=index,memory.free \
     --format=csv,noheader,nounits | sort -t',' -k2 -rn | head -1 | cut -d',' -f1 | tr -d ' ')
-echo "🖥️  Usando GPU $CUDA_VISIBLE_DEVICES"
+echo "Usando GPU $CUDA_VISIBLE_DEVICES"
 
 mkdir -p results/logs results/summary
 
-log_info() { echo "▶️  $*"; }
-log_success() { echo "✅ $*"; }
+log_info() { echo " $*"; }
+log_success() { echo " $*"; }
 
 log_time() {
     local label=$1

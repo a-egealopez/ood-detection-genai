@@ -3,6 +3,8 @@ experiment_name: vae
 model:
   model_type: vae
   latent_dim: 32
+  hidden_dim: 256
+  depth: 2
 
 training:
   epochs: 100
@@ -14,7 +16,6 @@ training:
 
 ood:
   primary_score: elbo
-  residual_components: 8
   knn_k: 5
 
 wandb:

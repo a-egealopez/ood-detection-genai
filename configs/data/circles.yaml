@@ -1,0 +1,10 @@
+data:
+  dataset: circles
+  n_samples: 600
+  noise: 0.05
+  factor: 0.5
+  train_frac: 0.7
+  input_dim: ???
+  num_workers: 0
+  pin_memory: false
+  ood_label: 1

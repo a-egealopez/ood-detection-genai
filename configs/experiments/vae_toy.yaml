@@ -1,0 +1,23 @@
+experiment_name: vae_toy
+
+model:
+  model_type: vae
+  latent_dim: 2
+  hidden_dim: 64
+  depth: 2
+
+training:
+  epochs: 200
+  lr: 1.0e-3
+  scheduler: cosine
+  warmup_epochs: 20
+  kl_weight: 1.0e-2
+  kl_warmup_epochs: 50
+
+ood:
+  primary_score: elbo
+  knn_k: 5
+
+wandb:
+  tags: [ood, vae, toy]
+  save_code: false

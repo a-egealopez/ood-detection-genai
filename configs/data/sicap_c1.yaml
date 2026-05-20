@@ -1,0 +1,14 @@
+# In-distribution:     Gleason 1 (benigno estricto)
+# Out-of-distribution: Gleason 2, 3 y 4
+
+data:
+  dataset: sicap_c1
+  features_dir: data/data_sicap/features_UNI/
+  input_dim: ???
+  n_train_samples: 10000
+  n_eval_samples: 10000
+  num_workers: 0
+  pin_memory: false
+  train_classes: [1]
+  test_classes:  [2, 3, 4]
+  ood_label: 2

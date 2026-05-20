@@ -5,15 +5,18 @@ import torch
 
 from src import stages as stg
 from src.artifacts import build_experiment_id, build_wandb_run
-from src.benchmarking import run_feature_distance, run_generate_table, run_summary
+from src.benchmarking import run_aggregate_tables, run_feature_distance, run_ranking_tables, run_summary, run_t_ablation
 from src.config import build_config, seed_everything
 from src.data import build_dataloaders
 from src.models import MODEL_REGISTRY
 from src.stages import StageContext
 
+_TOY_DATASETS = frozenset({"moons", "circles"})
+
 RECON_VISUALIZERS = {
-    "ddpm": stg.stage_reconstruction_viz_ddpm,
     "vae": stg.stage_reconstruction_viz_vae,
+    "ddpm": stg.stage_reconstruction_viz_ddpm,
+    "toy": stg.stage_reconstruction_viz_toy,
 }
 
 MODE_LABELS = {
@@ -31,20 +34,22 @@ def _parse_args():
         choices=["reconstruction-method", "distance-method", "stats-summary"],
         default="reconstruction-method",
     )
-    p.add_argument("--dataset", choices=["mnist", "sicap"], default="mnist")
+    p.add_argument("--dataset", choices=["mnist", "sicap_c1", "sicap_c12", "moons", "circles"], default="mnist")
     p.add_argument("--seed", type=int)
     p.add_argument("--config", type=str, default="configs/base.yaml")
 
-    p.add_argument("--experiment", choices=["vae", "ddpm"], default="vae")
+    p.add_argument("--experiment", choices=["vae", "ddpm", "vae_toy", "ddpm_toy"], default="vae")
     p.add_argument("--lr", type=float)
     p.add_argument("--epochs", type=int)
     p.add_argument("--skip-train", action="store_true")
     p.add_argument("--skip-eval", action="store_true")
 
-    p.add_argument("--distance-type", choices=["knn", "residual"], default="knn")
+    p.add_argument("--n-score-steps", type=int, default=None,
+                   help="Override DDPM n_score_steps for noise_multi ablation (eval only, no retrain).")
+    p.add_argument("--distance-type", choices=["knn", "mahalanobis"], default="knn")
     p.add_argument("--out", default="")
 
-    p.add_argument("--logs-dir", default="results/logs")
+    p.add_argument("--logs-dir", default="results")
     p.add_argument("--out-csv", default="results/summary/comparison.csv")
 
     args = p.parse_args()
@@ -53,14 +58,21 @@ def _parse_args():
         p.error("--skip-train/--skip-eval not applicable in distance-method mode")
     if args.mode == "stats-summary" and (args.skip_train or args.skip_eval or args.out != ""):
         p.error("--skip-train/--skip-eval/--out not applicable in stats-summary mode")
+    if args.n_score_steps is not None and (
+        args.mode != "reconstruction-method" or "ddpm" not in args.experiment
+    ):
+        p.error("--n-score-steps is only valid with --mode reconstruction-method and a ddpm experiment")
 
     return args
 
 
 def _mode_stats_summary(args):
-    out_csv = run_summary(logs_dir=args.logs_dir, out_csv=args.out_csv)
+    out_csv = run_summary(results_dir=args.logs_dir, out_csv=args.out_csv)
     print(f"saved: {out_csv}")
-    run_generate_table(csv_path=out_csv, out_dir=str(Path(out_csv).parent))
+    out_dir = str(Path(out_csv).parent)
+    run_ranking_tables(csv_path=out_csv, out_dir=out_dir)
+    run_aggregate_tables(csv_path=out_csv, out_dir=out_dir)
+    run_t_ablation(csv_path=out_csv, out_dir=out_dir)
 
 
 def _mode_distance_method(args):
@@ -94,7 +106,17 @@ def _mode_reconstruction_method(args):
         cfg.seed = args.seed
 
     cfg.method = "reconstruction-method"
+
+    
     cfg.experiment_name = build_experiment_id(cfg)
+
+
+    if args.n_score_steps is not None and str(cfg.model.get("model_type", "")) == "ddpm":
+        frozen_ckpt_dir = str(cfg.training.checkpoint_dir)  # resolves ${experiment_name} now
+        cfg.model.n_score_steps = args.n_score_steps
+        cfg.training.checkpoint_dir = frozen_ckpt_dir        # pin to training-time path
+        cfg.experiment_name = build_experiment_id(cfg)       # now encodes the new T
+
     cfg.wandb.run_name = cfg.experiment_name
 
     print(f"{MODE_LABELS[cfg.method]} — {cfg.experiment_name}")
@@ -127,7 +149,8 @@ def _mode_reconstruction_method(args):
         stg.stage_training(ctx)
 
     if not args.skip_eval:
-        if visualize := RECON_VISUALIZERS.get(cfg.model.model_type):
+        viz_key = "toy" if cfg.data.dataset in _TOY_DATASETS else cfg.model.model_type
+        if visualize := RECON_VISUALIZERS.get(viz_key):
             visualize(ctx)
         results = stg.stage_evaluation(ctx)
         stg.print_summary(cfg, results)

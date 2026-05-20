@@ -6,11 +6,12 @@ import torch
 import torch.nn as nn
 from diffusers import DDPMScheduler
 from omegaconf import DictConfig
+from tqdm.auto import tqdm
 
 from src.evaluation.plot import render_cell
 
 from .base_model import BaseOODModel
-from .ood_scorers import compute_ood_score
+from .ood_scorers import DEFAULT_KNN_K, build_latent_reference, compute_ood_score
 
 
 class SinusoidalPosEmb(nn.Module):
@@ -104,7 +105,9 @@ class ResidualMLPDenoiser(nn.Module):
 
 
 class DDPMModel(nn.Module, BaseOODModel):
-    SCORE_MODES: frozenset[str] = frozenset({"recon", "noise", "knn", "residual"})
+    SCORE_MODES: frozenset[str] = frozenset(
+        {"noise_single", "noise_multi_mse", "noise_multi_cosine", "residual_mah", "residual_knn"}
+    )
 
     def __init__(
         self,
@@ -117,7 +120,9 @@ class DDPMModel(nn.Module, BaseOODModel):
         beta_end: float,
         prediction_type: str,
         n_score_steps: int,
-        recon_timestep: int = 50,
+        recon_timestep: int = 250,
+        noise_timestep: int = 250,
+        ood_seed: int = 0,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
@@ -125,9 +130,10 @@ class DDPMModel(nn.Module, BaseOODModel):
         self.prediction_type = prediction_type
         self.n_score_steps = n_score_steps
         self.recon_timestep = recon_timestep
+        self.noise_timestep = noise_timestep
+        self.ood_seed = ood_seed
 
         self.ood_reference: dict | None = None
-        self._reference_t_encode: int = 40
 
         self.model = ResidualMLPDenoiser(
             input_dim=input_dim,
@@ -230,13 +236,37 @@ class DDPMModel(nn.Module, BaseOODModel):
         x_noisy = self.scheduler.add_noise(x, noise, t)
         pred = self.model(x_noisy, t)
         z = self._tweedie(x_noisy, pred, t)
-        return z.squeeze(1), None
+        return z, None
 
     def compute_loss(self, x: torch.Tensor, kl_weight: float = 0.0) -> dict[str, torch.Tensor]:
         return self.loss(x)
 
     def kl_weight_at(self, epoch: int, cfg) -> float:
         return 0.0
+
+    def _snapshot_fig_2d(
+        self, loaders: dict, cfg, device: torch.device, epoch: int, epochs: int
+    ) -> plt.Figure:
+        """Scatter-plot snapshot for 2D toy data."""
+        xs = torch.cat([x for x, _ in loaders["id_eval"]], dim=0).to(device)
+        t = torch.full((xs.shape[0],), self.noise_timestep, device=device, dtype=torch.long)
+        noise = self._fixed_noise(xs.shape, device)
+        with torch.no_grad():
+            x_recon, _, _ = self.reconstruct_at_t(xs, t, noise=noise)
+        orig = xs.cpu().numpy()
+        recon = x_recon.cpu().numpy()
+
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+        fig.suptitle(f"DDPM Snapshot (2D) — epoch {epoch}/{epochs}", fontsize=12, fontweight="bold")
+        kw = dict(s=10, alpha=0.65)
+        axes[0].scatter(orig[:, 0], orig[:, 1], c="steelblue", **kw)
+        axes[0].set_title("Original ID"); axes[0].set_aspect("equal"); axes[0].grid(True, alpha=0.3)
+        axes[1].scatter(recon[:, 0], recon[:, 1], c="darkorange", **kw)
+        axes[1].set_title(f"Tweedie recon (t={self.noise_timestep})")
+        axes[1].set_aspect("equal"); axes[1].grid(True, alpha=0.3)
+        plt.tight_layout()
+        self.train()
+        return fig
 
     def snapshot_fig(
         self,
@@ -247,6 +277,12 @@ class DDPMModel(nn.Module, BaseOODModel):
         epochs: int,
     ) -> plt.Figure:
         self.eval()
+        is_image = (
+            bool(cfg.data.get("is_image", False)) and int(cfg.data.get("input_dim", 0)) == 784
+        )
+        if not is_image and int(cfg.data.get("input_dim", 0)) == 2:
+            return self._snapshot_fig_2d(loaders, cfg, device, epoch, epochs)
+
         x_batch, labels = next(iter(loaders["id_eval"]))
         n_cols = 8
         x_batch = x_batch[:n_cols].to(device)
@@ -255,9 +291,6 @@ class DDPMModel(nn.Module, BaseOODModel):
             [1, 25, 50, 100, 250, 500, 750, max_t], device=device, dtype=torch.long
         )
 
-        is_image = (
-            bool(cfg.data.get("is_image", False)) and int(cfg.data.get("input_dim", 0)) == 784
-        )
         n_rows = 2 if is_image else 3
 
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.2 * n_cols, n_rows * 2.5))
@@ -304,60 +337,132 @@ class DDPMModel(nn.Module, BaseOODModel):
             "parameters": n_params,
         }
 
+    def _mse_score(self, x_recon: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        return self._recon_fn(x_recon, x).mean(dim=tuple(range(1, x.dim())))
+
+    def _cosine_dist(self, x_recon: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+        x_vec = x.reshape(x.shape[0], -1)
+        xr_vec = x_recon.reshape(x_recon.shape[0], -1)
+        cos_sim = (x_vec * xr_vec).sum(dim=1) / (x_vec.norm(dim=1) * xr_vec.norm(dim=1) + 1e-12)
+        return 1.0 - cos_sim
+
+    def _fixed_noise(self, shape: tuple, device: torch.device) -> torch.Tensor:
+        rng = torch.Generator(device=device).manual_seed(self.ood_seed)
+        return torch.randn(shape, generator=rng, device=device)
+
+    def _score_timesteps(self, device: torch.device) -> torch.Tensor:
+        return torch.linspace(
+            1, self.num_train_timesteps - 1, self.n_score_steps, dtype=torch.long, device=device
+        )
+
     @torch.no_grad()
-    def ood_score(self, x: torch.Tensor, mode: str = "recon") -> np.ndarray:
+    def ood_score(self, x: torch.Tensor, mode: str = "noise_single") -> np.ndarray:
         if mode not in self.SCORE_MODES:
             raise ValueError(
                 f"Unknown scoring mode '{mode}'. DDPMModel supports: {sorted(self.SCORE_MODES)}"
             )
 
         b = x.shape[0]
+        fixed_noise = self._fixed_noise(x.shape, x.device)
 
-        if mode in {"knn", "residual"}:
-            z_mu, _ = self.encode(x, t_encode=self._reference_t_encode)
-            return (
-                compute_ood_score(
-                    x=x,
-                    z_mu=z_mu,
-                    z_logvar=torch.zeros_like(z_mu),
-                    mode=mode,
-                    reference=self.ood_reference,
+        if mode == "noise_single":
+            t = torch.full((b,), self.noise_timestep, device=x.device, dtype=torch.long)
+            x_recon, _, _ = self.reconstruct_at_t(x, t, noise=fixed_noise)
+            return self._mse_score(x_recon, x).cpu().numpy()
+
+        score_timesteps = self._score_timesteps(x.device)
+
+        if mode == "noise_multi_mse":
+            if self.ood_reference is None or "noise_multi_stats_mse" not in self.ood_reference:
+                raise RuntimeError("OOD reference not built. Call build_ood_reference() first.")
+            per_level_stats = self.ood_reference["noise_multi_stats_mse"]
+            z_scores: list[torch.Tensor] = []
+            for t_step in score_timesteps:
+                t_key = int(t_step.item())
+                t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
+                x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
+                x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
+                mse_score = self._mse_score(x_recon, x)
+                z_scores.append(
+                    (mse_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
-                .cpu()
-                .numpy()
-            )
+            return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
-        ts = torch.linspace(
-            1,
-            self.num_train_timesteps - 1,
-            self.n_score_steps,
-            dtype=torch.long,
-            device=x.device,
+        if mode == "noise_multi_cosine":
+            if self.ood_reference is None or "noise_multi_stats_cosine" not in self.ood_reference:
+                raise RuntimeError("OOD reference not built. Call build_ood_reference() first.")
+            per_level_stats = self.ood_reference["noise_multi_stats_cosine"]
+            z_scores = []
+            for t_step in score_timesteps:
+                t_key = int(t_step.item())
+                t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
+                x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
+                x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
+                cosine_score = self._cosine_dist(x_recon, x)
+                z_scores.append(
+                    (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
+                )
+            return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
+
+        if self.ood_reference is None or "mahalanobis_mean" not in self.ood_reference:
+            raise RuntimeError("OOD reference not built. Call build_ood_reference() first.")
+        t_residual = torch.full((b,), self.recon_timestep, device=x.device, dtype=torch.long)
+        x_at_recon_t = self.scheduler.add_noise(x, fixed_noise, t_residual)
+        noise_pred_at_t = self.model(x_at_recon_t, t_residual)
+        residual = (noise_pred_at_t - fixed_noise).reshape(b, -1)
+        score_mode = "mahalanobis" if mode == "residual_mah" else "knn"
+        return (
+            compute_ood_score(feat=residual, mode=score_mode, reference=self.ood_reference)
+            .cpu()
+            .numpy()
         )
-        rng = torch.Generator(device=x.device).manual_seed(0)
-        fixed_noise = torch.randn(x.shape, generator=rng, device=x.device, dtype=x.dtype)
-        scores = torch.zeros(b, device=x.device)
-
-        for t_val in ts:
-            t = t_val.expand(b)
-            x_noisy = self.scheduler.add_noise(x, fixed_noise, t)
-            pred = self.model(x_noisy, t)
-
-            if mode == "recon":
-                x_recon = self._tweedie(x_noisy, pred, t)
-                scores += self._recon_fn(x_recon, x).mean(dim=tuple(range(1, x.dim())))
-            else:  # mode == "noise"
-                target = (
-                    fixed_noise
-                    if self.prediction_type == "epsilon"
-                    else self.scheduler.get_velocity(x, fixed_noise, t)
-                )
-                scores += self._recon_fn(pred, target).mean(dim=tuple(range(1, x.dim())))
-
-        return (scores / self.n_score_steps).cpu().numpy()
 
     def set_ood_reference(self, reference: dict | None) -> None:
         self.ood_reference = reference
+
+    @torch.no_grad()
+    def build_ood_reference(self, train_loader, device: torch.device, cfg) -> dict:
+        knn_k = int(cfg.ood.get("knn_k", DEFAULT_KNN_K)) if cfg else DEFAULT_KNN_K
+        score_timesteps = self._score_timesteps(device)
+        t_keys = [int(t.item()) for t in score_timesteps]
+
+        residuals: list[np.ndarray] = []
+        mse_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
+        cosine_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
+
+        self.eval()
+        for x_batch, _ in tqdm(train_loader, desc="Building OOD reference", leave=False):
+            x = x_batch.to(device)
+            b = x.shape[0]
+            fixed_noise = self._fixed_noise(x.shape, device)
+
+            
+            t_residual = torch.full((b,), self.recon_timestep, device=device, dtype=torch.long)
+            x_at_recon_t = self.scheduler.add_noise(x, fixed_noise, t_residual)
+            noise_pred_at_t = self.model(x_at_recon_t, t_residual)
+            residuals.append((noise_pred_at_t - fixed_noise).reshape(b, -1).cpu().numpy())
+
+    
+            for t_step in score_timesteps:
+                t_key = int(t_step.item())
+                t_batch = torch.full((b,), t_key, device=device, dtype=torch.long)
+                x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
+                x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
+                mse_stats_per_t[t_key].extend(self._mse_score(x_recon, x).cpu().tolist())
+                cosine_stats_per_t[t_key].extend(self._cosine_dist(x_recon, x).cpu().tolist())
+
+        residuals_np = np.concatenate(residuals, axis=0)
+        ref = build_latent_reference(residuals_np, knn_k=knn_k, normalize_knn=False, reg=1e-5)
+
+        ref["noise_multi_stats_mse"] = {
+            t_key: {"mean": float(np.mean(vals)), "std": float(np.std(vals) + 1e-8)}
+            for t_key, vals in mse_stats_per_t.items()
+        }
+        ref["noise_multi_stats_cosine"] = {
+            t_key: {"mean": float(np.mean(vals)), "std": float(np.std(vals) + 1e-8)}
+            for t_key, vals in cosine_stats_per_t.items()
+        }
+        return ref
 
     def save(self, path: str) -> None:
         torch.save(self.state_dict(), path)
@@ -378,6 +483,8 @@ def build_ddpm_model(cfg: DictConfig, device: torch.device) -> DDPMModel:
         beta_end=float(m.beta_end),
         prediction_type=str(m.prediction_type),
         n_score_steps=int(m.n_score_steps),
-        recon_timestep=int(m.get("recon_timestep", 50)),
+        recon_timestep=int(m.get("recon_timestep", 250)),
+        noise_timestep=int(m.get("noise_timestep", 250)),
+        ood_seed=int(cfg.get("seed", 0)),
         dropout=float(m.get("dropout", 0.0)),
     ).to(device)

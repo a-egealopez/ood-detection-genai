@@ -1,6 +1,5 @@
 seed: 42
 experiment_name: ???
-logs_dir: results/logs
 
 training:
   epochs: 200
@@ -31,9 +30,10 @@ wandb:
 
 viz:
   plots_dir: results/${experiment_name}/plots/
-  projectors: [pca]          # extender en cada experimento si se necesita tsne/umap
+  projectors: [pca, umap]
   pca_n_components: 50
   tsne_perplexity: 30
   umap_n_neighbors: 15
   umap_min_dist: 0.1
   umap_metric: euclidean
+  umap_pca_init_components: 50

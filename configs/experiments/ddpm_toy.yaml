@@ -1,10 +1,10 @@
-experiment_name: ddpm
+experiment_name: ddpm_toy
 
 model:
   model_type: ddpm
-  hidden_dim: 1024
-  depth: 8
-  time_emb_dim: 512
+  hidden_dim: 128
+  depth: 4
+  time_emb_dim: 128
   dropout: 0.0
   num_train_timesteps: 1000
   beta_start: 0.0001
@@ -15,7 +15,7 @@ model:
   noise_timestep: 250
 
 training:
-  lr: 1.0e-4
+  lr: 1.0e-3
   epochs: 300
   optimizer: adamw
   scheduler: cosine
@@ -29,5 +29,5 @@ ood:
   knn_k: 1
 
 wandb:
-  tags: [ood, ddpm]
+  tags: [ood, ddpm, toy]
   save_code: false
