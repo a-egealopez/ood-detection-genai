@@ -43,11 +43,41 @@ def _load_ablation_df(csv_path: Path) -> pd.DataFrame:
     return df[mask].copy()
 
 
+def _write_ablation_tex(
+    grouped_all: pd.DataFrame, t_vals_all: list[int], datasets: list[str], out: Path
+) -> None:
+    n_cols = 1 + len(t_vals_all)
+    col_spec = "l" + "c" * len(t_vals_all)
+    lines = [
+        rf"\begin{{tabular}}{{{col_spec}}}",
+        r"\toprule",
+        "Score Mode & " + " & ".join(f"$T={t}$" for t in t_vals_all) + r" \\",
+        r"\midrule",
+    ]
+    for i, dataset in enumerate(datasets):
+        if i > 0:
+            lines.append(r"\midrule")
+        lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
+        lines.append(r"\midrule")
+        sub = grouped_all[grouped_all["dataset"] == dataset]
+        for mode in _DDPM_SCORE_MODES:
+            mode_data = sub[sub["score"] == mode].set_index("T")["AUROC"]
+            cells = [
+                f"{mode_data[t]:.4f}" if t in mode_data.index else "--"
+                for t in t_vals_all
+            ]
+            lines.append(_MODE_LABELS[mode] + " & " + " & ".join(cells) + r" \\")
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    tex_path = out / "table_ablation_t.tex"
+    tex_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"Saved → {tex_path}")
+
+
 def run_t_ablation(
     csv_path: str = "results/summary/comparison.csv",
     out_dir: str = "results/summary",
 ) -> None:
-    """Fig 12: AUROC vs T line plot. Tab 13: T ablation markdown table."""
+    """Fig 12: AUROC vs T line plot. Tab 13: T ablation table (markdown + LaTeX)."""
     src = Path(csv_path)
     if not src.exists():
         raise FileNotFoundError(f"File not found: {src}")
@@ -115,29 +145,4 @@ def run_t_ablation(
     )
     t_vals_all = sorted(abl["t_steps"].dropna().unique().astype(int))
 
-    lines = ["# DDPM — Ablación de T (n_score_steps)\n"]
-    for dataset in datasets:
-        lines.append(f"## {dataset.upper()}\n")
-        sub = grouped_all[grouped_all["dataset"] == dataset]
-        if sub.empty:
-            lines.append("Sin datos.\n")
-            continue
-
-        t_cols = [f"T={t}" for t in t_vals_all]
-        header = "| Score Mode | " + " | ".join(t_cols) + " |"
-        sep    = "|------------|" + "|".join("------" for _ in t_cols) + "|"
-        lines += [header, sep]
-
-        for mode in _DDPM_SCORE_MODES:
-            mode_data = sub[sub["score"] == mode].set_index("T")["AUROC"]
-            cells = [
-                f"{mode_data[t]:.4f}" if t in mode_data.index else "-"
-                for t in t_vals_all
-            ]
-            lines.append(f"| {_MODE_LABELS[mode]} | " + " | ".join(cells) + " |")
-
-        lines.append("")
-
-    tab_path = out / "table_ablation_t.md"
-    tab_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Saved → {tab_path}")
+    _write_ablation_tex(grouped_all, t_vals_all, datasets, out)

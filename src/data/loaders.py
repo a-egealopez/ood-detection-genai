@@ -125,22 +125,22 @@ def _build_sicap_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
 
 
 def _build_toy_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
-    from sklearn.datasets import make_circles, make_moons
+    from sklearn.datasets import make_moons
 
     dataset_name = str(cfg.data.dataset)
     n_samples = int(cfg.data.get("n_samples", 600))
     noise = float(cfg.data.get("noise", 0.05))
     seed = int(cfg.get("seed", 42))
 
-    if dataset_name == "moons":
-        X, y = make_moons(n_samples=n_samples, noise=noise, random_state=seed)
-    else:
-        factor = float(cfg.data.get("factor", 0.5))
-        X, y = make_circles(n_samples=n_samples, noise=noise, factor=factor, random_state=seed)
+    X, y = make_moons(n_samples=n_samples, noise=noise, random_state=seed)
 
     X = X.astype(np.float32)
     X_id, y_id = X[y == 0], y[y == 0]
     X_ood, y_ood = X[y == 1], y[y == 1]
+
+    rng = np.random.default_rng(seed)
+    idx = rng.permutation(len(X_id))
+    X_id, y_id = X_id[idx], y_id[idx]
 
     n_train = int(len(X_id) * float(cfg.data.get("train_frac", 0.7)))
     X_train, y_train = X_id[:n_train], y_id[:n_train]
@@ -163,12 +163,122 @@ def _build_toy_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     )
 
 
+def _build_blobs_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
+    from sklearn.datasets import make_blobs
+
+    n_samples = int(cfg.data.get("n_samples", 2000))
+    centers = cfg.data.get("centers", [[-2.0, 0.0], [2.0, 0.0]])
+    cluster_std = float(cfg.data.get("cluster_std", 0.5))
+    seed = int(cfg.get("seed", 42))
+
+    X, y = make_blobs(
+        n_samples=n_samples,
+        centers=list(centers),
+        cluster_std=cluster_std,
+        random_state=seed,
+    )
+
+    X = X.astype(np.float32)
+    X_id, y_id = X[y == 0], y[y == 0]
+    X_ood, y_ood = X[y == 1], y[y == 1]
+
+    rng = np.random.default_rng(seed)
+    idx = rng.permutation(len(X_id))
+    X_id, y_id = X_id[idx], y_id[idx]
+
+    n_train = int(len(X_id) * float(cfg.data.get("train_frac", 0.7)))
+    X_train, y_train = X_id[:n_train], y_id[:n_train]
+    X_id_eval, y_id_eval = X_id[n_train:], y_id[n_train:]
+
+    mean = X_train.mean(axis=0, keepdims=True)
+    std = X_train.std(axis=0, keepdims=True)
+    std = np.where(std < 1e-6, 1.0, std)
+
+    datasets = {
+        "train": _to_tensor_dataset(X_train, y_train, mean, std),
+        "id_eval": _to_tensor_dataset(X_id_eval, y_id_eval, mean, std),
+        "ood_eval": _to_tensor_dataset(X_ood, y_ood, mean, std),
+    }
+    return datasets, DataLoaderSpec(
+        id_name="blobs_id",
+        ood_name="blobs_ood",
+        input_dim=2,
+        is_image=False,
+    )
+
+
+def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
+    try:
+        from medmnist import PathMNIST
+    except ImportError:
+        raise ImportError("medmnist is required: pip install medmnist")
+
+    root = str(cfg.data.get("root", "data/"))
+    norm_label = int(cfg.data.get("norm_label", 6))
+    tum_label = int(cfg.data.get("tum_label", 8))
+    n_train = cfg.data.get("n_train_samples", None)
+    n_eval = cfg.data.get("n_eval_samples", None)
+
+    train_ds = PathMNIST(split="train", download=True, root=root)
+    test_ds = PathMNIST(split="test", download=True, root=root)
+
+    def to_float(imgs: np.ndarray) -> np.ndarray:
+        # (N, 28, 28, 3) uint8 -> (N, 2352) float32 in [-1, 1]
+        x = imgs.astype(np.float32) / 255.0
+        x = (x - 0.5) / 0.5
+        return x.transpose(0, 3, 1, 2).reshape(-1, 3 * 28 * 28)
+
+    x_train_all = to_float(train_ds.imgs)
+    y_train_all = train_ds.labels.squeeze()
+    x_test_all = to_float(test_ds.imgs)
+    y_test_all = test_ds.labels.squeeze()
+
+    x_train = x_train_all[y_train_all == norm_label]
+    y_train = y_train_all[y_train_all == norm_label]
+    x_id = x_test_all[y_test_all == norm_label]
+    y_id = y_test_all[y_test_all == norm_label]
+    x_ood = x_test_all[y_test_all == tum_label]
+    y_ood = y_test_all[y_test_all == tum_label]
+
+    if len(x_train) == 0 or len(x_id) == 0 or len(x_ood) == 0:
+        raise ValueError("PathMNIST class filtering produced an empty split.")
+
+    def first_n(x, y, n):
+        if n is None:
+            return x, y
+        n = min(n, len(x))
+        return x[:n], y[:n]
+
+    x_train, y_train = first_n(x_train, y_train, n_train)
+    x_id, y_id = first_n(x_id, y_id, n_eval)
+    x_ood, y_ood = first_n(x_ood, y_ood, n_eval)
+
+    def to_ds(x, y):
+        return TensorDataset(
+            torch.from_numpy(x).float(),
+            torch.from_numpy(y.astype(np.int64)).long(),
+        )
+
+    datasets = {
+        "train": to_ds(x_train, y_train),
+        "id_eval": to_ds(x_id, y_id),
+        "ood_eval": to_ds(x_ood, y_ood),
+    }
+    return datasets, DataLoaderSpec(
+        id_name="PathMNIST-NORM",
+        ood_name="PathMNIST-TUM",
+        input_dim=3 * 28 * 28,
+        is_image=True,
+    )
+
+
 _DATASET_BUILDERS = {
     "mnist": _build_mnist_dataset,
     "sicap_c1": _build_sicap_dataset,
     "sicap_c12": _build_sicap_dataset,
     "moons": _build_toy_dataset,
-    "circles": _build_toy_dataset,
+    "blobs": _build_blobs_dataset,
+    "pathmnist": _build_pathmnist_dataset,
 }
 
 

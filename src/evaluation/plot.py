@@ -24,7 +24,11 @@ if TYPE_CHECKING:
 def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) -> None:
     arr = tensor.squeeze().cpu().numpy()
     if is_image:
-        ax.imshow(arr.reshape(28, 28), cmap="gray", vmin=-1, vmax=1)
+        if arr.size == 784:
+            ax.imshow(arr.reshape(28, 28), cmap="gray", vmin=-1, vmax=1)
+        else:
+            img = arr.reshape(3, 28, 28).transpose(1, 2, 0)
+            ax.imshow(np.clip(img * 0.5 + 0.5, 0, 1))
     else:
         ax.plot(arr, color=color, lw=1.0)
         ax.grid(True, alpha=0.2)
@@ -70,6 +74,14 @@ def _plot_roc_curve(
     ax.grid(True, alpha=0.3)
 
 
+_SCORE_GROUPS: list[list[str]] = [
+    ["recon", "elbo"],
+    ["latent_knn", "latent_mah"],
+    ["noise_single", "noise_multi_mse", "noise_multi_cosine"],
+    ["residual_mah", "residual_knn"],
+]
+
+
 def plot_ood_evaluation(
     scores: ScoreBundle,
     aurocs: dict[str, float],
@@ -77,35 +89,43 @@ def plot_ood_evaluation(
     run=None,
     plots_dir: Path | None = None,
 ) -> None:
-    """Render score distribution and ROC figures for each pair of active scoring modes."""
+    """Render score distribution and ROC figures, one figure per predefined score group."""
+    active_set = {m for m, _, _ in active}
+    active_map = {m: (id_a, ood_a) for m, id_a, ood_a in active}
 
-    for i in range(0, len(active), 2):
-        chunk = active[i : i + 2]
+    for group in _SCORE_GROUPS:
+        chunk = [(m, *active_map[m]) for m in group if m in active_set]
+        if not chunk:
+            continue
+        mode_names = "+".join(m for m, _, _ in chunk)
+
         fig, axes = plt.subplots(len(chunk), 2, figsize=(16, 5 * len(chunk)))
         if len(chunk) == 1:
             axes = axes[np.newaxis, :]
-        mode_names = "+".join(m for m, _, _ in chunk)
         fig.suptitle(f"OOD Evaluation — {mode_names}", fontsize=14, fontweight="bold")
+
         for row, (mode, id_attr, ood_attr) in enumerate(chunk):
             _plot_score_distribution(
-                getattr(scores, id_attr),
-                getattr(scores, ood_attr),
-                mode,
-                aurocs[mode],
-                axes[row, 0],
+                getattr(scores, id_attr), getattr(scores, ood_attr),
+                mode, aurocs[mode], axes[row, 0],
             )
             _plot_roc_curve(
-                getattr(scores, id_attr),
-                getattr(scores, ood_attr),
-                mode,
-                aurocs[mode],
-                axes[row, 1],
+                getattr(scores, id_attr), getattr(scores, ood_attr),
+                mode, aurocs[mode], axes[row, 1],
             )
+
         plt.tight_layout()
         if plots_dir is not None:
-            plots_dir.mkdir(parents=True, exist_ok=True)
-            fig.savefig(plots_dir / f"ood_scores_{mode_names}.png", dpi=150, bbox_inches="tight")
-        if run is not None:
+            save_figure(
+                fig=fig,
+                out_path=plots_dir / f"ood_scores_{mode_names}.png",
+                run=run,
+                image_key=f"eval/ood_scores/{mode_names}",
+                artifact_type="plot",
+                artifact_prefix="ood-scores",
+                metadata={"modes": mode_names},
+            )
+        elif run is not None:
             run.log({f"eval/ood_scores/{mode_names}": wandb.Image(fig)})
         plt.close(fig)
 
@@ -141,17 +161,19 @@ def _project_tsne(zs: np.ndarray, cfg: DictConfig) -> np.ndarray:
 
 
 def _project_umap(zs: np.ndarray, cfg: DictConfig) -> np.ndarray:
+    import warnings
     zs_r = _pca_preprocess(_standardize_scale(zs), cfg, components_key="umap_pca_init_components")
     n_neighbors = min(int(cfg.viz.get("umap_n_neighbors", 15)), zs_r.shape[0] - 1)
-    return umap.UMAP(
-        n_components=2,
-        n_neighbors=n_neighbors,
-        min_dist=float(cfg.viz.get("umap_min_dist", 0.1)),
-        metric=str(cfg.viz.get("umap_metric", "euclidean")),
-        n_jobs=-1,
-        random_state=cfg.seed,
-        verbose=False,
-    ).fit_transform(zs_r)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="n_jobs value", category=UserWarning)
+        return umap.UMAP(
+            n_components=2,
+            n_neighbors=n_neighbors,
+            min_dist=float(cfg.viz.get("umap_min_dist", 0.1)),
+            metric=str(cfg.viz.get("umap_metric", "euclidean")),
+            random_state=cfg.seed,
+            verbose=False,
+        ).fit_transform(zs_r)
 
 
 PROJECTOR_REGISTRY: dict[str, callable] = {

@@ -123,7 +123,10 @@ class VAEModel(nn.Module, BaseOODModel):
             "parameters": n_params,
         }
 
-    SCORE_MODES: frozenset[str] = frozenset({"recon", "elbo", "knn", "mahalanobis"})
+    SCORE_MODES: frozenset[str] = frozenset({"recon", "elbo", "latent_knn", "latent_mah"})
+
+    # Maps public score mode names to the internal strings expected by compute_ood_score.
+    _SCORER_MODE: dict[str, str] = {"latent_knn": "knn", "latent_mah": "mahalanobis"}
 
     @torch.no_grad()
     def ood_score(self, x: torch.Tensor, mode: str = "recon") -> np.ndarray:
@@ -139,7 +142,7 @@ class VAEModel(nn.Module, BaseOODModel):
             feat=z_mu,
             z_logvar=z_logvar,
             kl_weight=self.kl_weight,
-            mode=mode,
+            mode=self._SCORER_MODE.get(mode, mode),
             recon_fn=self._recon_fn,
             reference=self.ood_reference,
         )

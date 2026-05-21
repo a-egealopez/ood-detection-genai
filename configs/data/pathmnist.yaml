@@ -1,0 +1,11 @@
+data:
+  dataset: pathmnist
+  root: data/
+  norm_label: 6
+  tum_label: 8
+  n_train_samples: null
+  n_eval_samples: null
+  input_dim: ???
+  ood_label: 8
+  num_workers: 2
+  pin_memory: true

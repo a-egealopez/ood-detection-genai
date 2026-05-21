@@ -5,13 +5,13 @@ import torch
 
 from src import stages as stg
 from src.artifacts import build_experiment_id, build_wandb_run
-from src.benchmarking import run_aggregate_tables, run_feature_distance, run_ranking_tables, run_summary, run_t_ablation
+from src.benchmarking import run_aggregate_tables, run_feature_distance, run_summary, run_t_ablation
 from src.config import build_config, seed_everything
 from src.data import build_dataloaders
 from src.models import MODEL_REGISTRY
 from src.stages import StageContext
 
-_TOY_DATASETS = frozenset({"moons", "circles"})
+_TOY_DATASETS = frozenset({"moons", "blobs"})
 
 RECON_VISUALIZERS = {
     "vae": stg.stage_reconstruction_viz_vae,
@@ -34,11 +34,11 @@ def _parse_args():
         choices=["reconstruction-method", "distance-method", "stats-summary"],
         default="reconstruction-method",
     )
-    p.add_argument("--dataset", choices=["mnist", "sicap_c1", "sicap_c12", "moons", "circles"], default="mnist")
+    p.add_argument("--dataset", choices=["mnist", "sicap_c1", "sicap_c12", "moons", "blobs", "pathmnist"], default="mnist")
     p.add_argument("--seed", type=int)
     p.add_argument("--config", type=str, default="configs/base.yaml")
 
-    p.add_argument("--experiment", choices=["vae", "ddpm", "vae_toy", "ddpm_toy"], default="vae")
+    p.add_argument("--experiment", choices=["vae", "ddpm", "vae_toy", "ddpm_toy", "vae_path", "ddpm_path"], default="vae")
     p.add_argument("--lr", type=float)
     p.add_argument("--epochs", type=int)
     p.add_argument("--skip-train", action="store_true")
@@ -70,7 +70,6 @@ def _mode_stats_summary(args):
     out_csv = run_summary(results_dir=args.logs_dir, out_csv=args.out_csv)
     print(f"saved: {out_csv}")
     out_dir = str(Path(out_csv).parent)
-    run_ranking_tables(csv_path=out_csv, out_dir=out_dir)
     run_aggregate_tables(csv_path=out_csv, out_dir=out_dir)
     run_t_ablation(csv_path=out_csv, out_dir=out_dir)
 
@@ -137,26 +136,27 @@ def _mode_reconstruction_method(args):
         experiment_id=build_experiment_id(cfg),
     )
 
-    if args.skip_train:
-        ckpt_path = Path(cfg.training.checkpoint_dir) / "model.pth"
-        if not ckpt_path.exists():
-            raise FileNotFoundError(f"No checkpoint found at {ckpt_path}. Train first.")
-        model.load(str(ckpt_path), device)
-        print(f"Loaded checkpoint: {ckpt_path}")
-    else:
-        stg.stage_input_space_viz(ctx)
-        torch.cuda.empty_cache()
-        stg.stage_training(ctx)
+    try:
+        if args.skip_train:
+            ckpt_path = Path(cfg.training.checkpoint_dir) / "model.pth"
+            if not ckpt_path.exists():
+                raise FileNotFoundError(f"No checkpoint found at {ckpt_path}. Train first.")
+            model.load(str(ckpt_path), device)
+            print(f"Loaded checkpoint: {ckpt_path}")
+        else:
+            stg.stage_input_space_viz(ctx)
+            torch.cuda.empty_cache()
+            stg.stage_training(ctx)
 
-    if not args.skip_eval:
-        viz_key = "toy" if cfg.data.dataset in _TOY_DATASETS else cfg.model.model_type
-        if visualize := RECON_VISUALIZERS.get(viz_key):
-            visualize(ctx)
-        results = stg.stage_evaluation(ctx)
-        stg.print_summary(cfg, results)
-
-    if cfg.wandb.enabled:
-        run.finish()
+        if not args.skip_eval:
+            viz_key = "toy" if cfg.data.dataset in _TOY_DATASETS else cfg.model.model_type
+            if visualize := RECON_VISUALIZERS.get(viz_key):
+                visualize(ctx)
+            results = stg.stage_evaluation(ctx)
+            stg.print_summary(cfg, results)
+    finally:
+        if cfg.wandb.enabled:
+            run.finish()
 
 
 MODE_DISPATCH = {

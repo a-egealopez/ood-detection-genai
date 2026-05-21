@@ -13,8 +13,6 @@ import src.training as train
 from src.artifacts import save_figure
 from src.evaluation.plot import plot_ood_evaluation, project_pca, render_cell
 
-_IMAGE_FLAT_DIM = 784
-
 
 @dataclass(frozen=True)
 class StageContext:
@@ -44,7 +42,7 @@ class DatasetMetadata:
         return cls(
             id_name=cfg.data.get("id_name", "ID"),
             ood_name=cfg.data.get("ood_name", "OOD"),
-            ood_label=int(cfg.data.ood_label),
+            ood_label=int(cfg.data.get("ood_label", 1)),
         )
 
 
@@ -64,8 +62,6 @@ def stage_input_space_viz(ctx: StageContext) -> None:
             title=f"Input Space — {metadata.id_name} (ID)",
             label_map={i: str(i) for i in range(metadata.ood_label)},
             ood_label=None,
-            run=ctx.run,
-            wandb_key="viz/input_space",
         ),
         ctx,
         "input_space.png",
@@ -79,8 +75,6 @@ def stage_input_space_viz(ctx: StageContext) -> None:
             title=f"Input Space — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
             label_map=metadata.label_map,
             ood_label=metadata.ood_label,
-            run=ctx.run,
-            wandb_key="viz/input_space_vs_ood",
         ),
         ctx,
         "input_space_vs_ood.png",
@@ -181,11 +175,13 @@ def stage_evaluation(ctx: StageContext):
             save_name="embedding_vs_ood",
         )
         plt.show()
+        plt.close()
 
-    raw_vecs, raw_labs, recon_vecs, recon_labs = _collect_recon_vectors(ctx)
-    _plot_embedding_panel(
-        ctx, raw_vecs, raw_labs, embeddings_id, labels_id, recon_vecs, recon_labs, embed_label
-    )
+    if str(ctx.cfg.model.model_type) == "vae":
+        raw_vecs, raw_labs, recon_vecs, recon_labs = _collect_recon_vectors(ctx)
+        _plot_embedding_panel(
+            ctx, raw_vecs, raw_labs, embeddings_id, labels_id, recon_vecs, recon_labs, embed_label
+        )
 
     from src.evaluation.evaluate import _active_modes
     active = _active_modes(scores)
@@ -261,9 +257,7 @@ def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata) 
         x_recon_id, _, _ = ctx.model(x_id)
         x_recon_ood, _, _ = ctx.model(x_ood)
 
-    is_image = int(ctx.cfg.data.input_dim) == _IMAGE_FLAT_DIM and bool(
-        ctx.cfg.data.get("is_image", True)
-    )
+    is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
 
     fig, axes = plt.subplots(4, 8, figsize=(16, 9))
@@ -314,9 +308,7 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
             x_ood, t_values, noise=torch.randn_like(x_ood)
         )
 
-    is_image = (
-        bool(ctx.cfg.data.get("is_image", False)) and int(ctx.cfg.data.input_dim) == _IMAGE_FLAT_DIM
-    )
+    is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
     n_cols = len(keyframes) + 1
 
@@ -381,9 +373,7 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         x_ref_ood, t_start=t_start, capture_timesteps=captures, noise=torch.randn_like(x_ref_ood)
     )
 
-    is_image = (
-        bool(ctx.cfg.data.get("is_image", False)) and int(ctx.cfg.data.input_dim) == _IMAGE_FLAT_DIM
-    )
+    is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
     n_rows = x_ref_id.shape[0] + x_ref_ood.shape[0]
 
@@ -526,7 +516,7 @@ def _plot_embedding_panel(
 def _build_scores_payload(scores) -> dict:
     payload = {}
     all_modes = [
-        "recon", "elbo", "knn", "mahalanobis",
+        "recon", "elbo", "latent_knn", "latent_mah",
         "noise_single", "noise_multi_mse", "noise_multi_cosine",
         "residual_mah", "residual_knn",
     ]

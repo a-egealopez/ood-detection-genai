@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-# --- experiment defaults (override via env) ---
 SEED="${SEED:-42}"
-TOY_DATASETS="${TOY_DATASETS:-moons circles}"
+TOY_DATASETS="${TOY_DATASETS:-moons blobs}"
 SICAP_DATASETS="${SICAP_DATASETS:-sicap_c1 sicap_c12}"
 SEED_TOY="${SEED_TOY:-42}"
 LR_VAE_TOY="${LR_VAE_TOY:-1e-3}"
@@ -12,11 +11,15 @@ SEED_MNIST="${SEED_MNIST:-42}"
 LR_VAE_MNIST="${LR_VAE_MNIST:-1e-4}"
 LR_DDPM_MNIST="${LR_DDPM_MNIST:-1e-4}"
 
+SEED_PATH="${SEED_PATH:-42}"
+LR_VAE_PATH="${LR_VAE_PATH:-1e-4}"
+LR_DDPM_PATH="${LR_DDPM_PATH:-1e-4}"
+
 SEEDS="${SEEDS:-42 107 2024}"
 LRS_VAE="${LRS_VAE:-1e-4 5e-4 1e-3}"
 LRS_DDPM="${LRS_DDPM:-1e-4 5e-4 1e-3}"
 
-# T ablation runs on a single seed+lr (set to best after sweep)
+
 T_VALUES="${T_VALUES:-5 10 25 50}"
 BEST_SEED="${BEST_SEED:-42}"
 BEST_LR_DDPM="${BEST_LR_DDPM:-1e-4}"

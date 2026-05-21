@@ -1,10 +1,10 @@
-experiment_name: ddpm_toy
+experiment_name: ddpm_path
 
 model:
   model_type: ddpm
-  hidden_dim: 64
-  depth: 2
-  time_emb_dim: 64
+  hidden_dim: 512
+  depth: 6
+  time_emb_dim: 256
   dropout: 0.0
   num_train_timesteps: 1000
   beta_start: 0.0001
@@ -15,19 +15,19 @@ model:
   noise_timestep: 250
 
 training:
-  lr: 1.0e-3
-  epochs: 100
+  lr: 1.0e-4
+  epochs: 200
   optimizer: adamw
   scheduler: cosine
-  warmup_epochs: 10
+  warmup_epochs: 30
   use_ema: true
   early_stopping: true
-  early_stopping_patience: 30
+  early_stopping_patience: 50
 
 ood:
   primary_score: noise_single
   knn_k: 1
 
 wandb:
-  tags: [ood, ddpm, toy]
+  tags: [ood, ddpm, pathmnist]
   save_code: false

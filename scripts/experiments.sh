@@ -20,10 +20,10 @@ exp_0() {
     done
 }
 
-# ── 1. Toy (moons + circles) ─────────────────────────────────────────────────
+# ── 1. Toy (moons + blobs) ─────────────────────────────────────────────────
 
 exp_1_train() {
-    log_info "[1_train] toy train (datasets=(moons + circles))"
+    log_info "[1_train] toy train (datasets=(moons + blobs))"
     for dataset in $TOY_DATASETS; do
         run_loop --skip-eval vae_toy  "$dataset" "$SEED_TOY" "$LR_VAE_TOY"
         run_loop --skip-eval ddpm_toy "$dataset" "$SEED_TOY" "$LR_DDPM_TOY"
@@ -31,7 +31,7 @@ exp_1_train() {
 }
 
 exp_1_eval() {
-    log_info "[1_eval] toy eval (datasets=(moons + circles))"
+    log_info "[1_eval] toy eval (datasets=(moons + blobs))"
     for dataset in $TOY_DATASETS; do
         run_loop --skip-train vae_toy  "$dataset" "$SEED_TOY" "$LR_VAE_TOY"
         run_loop --skip-train ddpm_toy "$dataset" "$SEED_TOY" "$LR_DDPM_TOY"
@@ -56,30 +56,46 @@ exp_2_eval() {
 
 exp_2() { exp_2_train; exp_2_eval; }
 
-# ── 3. SICAP (sicap_c1 + sicap_c12) ─────────────────────────────────────────
+# ── 3. PathMNIST (NORM vs TUM) ───────────────────────────────────────────────
 
 exp_3_train() {
-    log_info "[3_train] sicap train (datasets=sicap_c1 sicap_c12 seeds=$SEEDS)"
+    log_info "[3_train] pathmnist train (seed=$SEED_PATH)"
+    run_loop --skip-eval vae_path  pathmnist "$SEED_PATH" "$LR_VAE_PATH"
+    run_loop --skip-eval ddpm_path pathmnist "$SEED_PATH" "$LR_DDPM_PATH"
+}
+
+exp_3_eval() {
+    log_info "[3_eval] pathmnist eval (seed=$SEED_PATH)"
+    run_loop --skip-train vae_path  pathmnist "$SEED_PATH" "$LR_VAE_PATH"
+    run_loop --skip-train ddpm_path pathmnist "$SEED_PATH" "$LR_DDPM_PATH"
+}
+
+exp_3() { exp_3_train; exp_3_eval; }
+
+# ── 4. SICAP (sicap_c1 + sicap_c12) ─────────────────────────────────────────
+
+exp_4_train() {
+    log_info "[4_train] sicap train (datasets=sicap_c1 sicap_c12 seeds=$SEEDS)"
     for dataset in $SICAP_DATASETS; do
         run_loop --skip-eval vae  "$dataset" "$SEEDS" "$LRS_VAE"
         run_loop --skip-eval ddpm "$dataset" "$SEEDS" "$LRS_DDPM"
     done
 }
 
-exp_3_eval() {
-    log_info "[3_eval] sicap eval (datasets=sicap_c1 sicap_c12 seeds=$SEEDS)"
+exp_4_eval() {
+    log_info "[4_eval] sicap eval (datasets=sicap_c1 sicap_c12 seeds=$SEEDS)"
     for dataset in $SICAP_DATASETS; do
         run_loop --skip-train vae  "$dataset" "$SEEDS" "$LRS_VAE"
         run_loop --skip-train ddpm "$dataset" "$SEEDS" "$LRS_DDPM"
     done
 }
 
-exp_3() { exp_3_train; exp_3_eval; }
+exp_4() { exp_4_train; exp_4_eval; }
 
-# ── 4. T ablation (ddpm, best seed + lr) ─────────────────────────────────────
+# ── 5. T ablation (ddpm, best seed + lr) ─────────────────────────────────────
 
-exp_4() {
-    log_info "[4] ddpm T ablation (seed=$BEST_SEED lr=$BEST_LR_DDPM T=$T_VALUES)"
+exp_5() {
+    log_info "[5] ddpm T ablation (seed=$BEST_SEED lr=$BEST_LR_DDPM T=$T_VALUES)"
     for dataset in $SICAP_DATASETS; do
         for t in $T_VALUES; do
             log_info "[ddpm] $dataset T=$t"
@@ -108,5 +124,6 @@ exp_all() {
     exp_2
     exp_3
     exp_4
+    exp_5
     summary
 }

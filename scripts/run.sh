@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# 2-GPU setup (terminal por línea, lanzar a la vez):
-#   CUDA_VISIBLE_DEVICES=0 bash scripts/run.sh 1 2               # toy + mnist en GPU 0
-#   CUDA_VISIBLE_DEVICES=1 bash scripts/run.sh 3 4                # sicap en GPU 1
-#   bash scripts/run.sh 0                                        # baseline en CPU
-#   al terminar las tres: SUMMARIZE=1 bash scripts/run.sh        # resumen final
+# 2-GPU setup — mnist y pathmnist son los más lentos, se reparten entre GPUs:
+#   CUDA_VISIBLE_DEVICES=0 bash scripts/run.sh 1 2               # toy (rápido) + mnist (lento)
+#   CUDA_VISIBLE_DEVICES=1 bash scripts/run.sh 3 4 5             # pathmnist (lento) + sicap + T-ablation
+#   bash scripts/run.sh 0                                        # baseline en CPU (ligero)
+#   al terminar: SUMMARIZE=1 bash scripts/run.sh                 # resumen final
 
 set -euo pipefail
 DIR="$(dirname "$0")"

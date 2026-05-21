@@ -15,8 +15,8 @@ from .extract import ScoreBundle
 _ALL_MODES: list[tuple[str, str, str]] = [
     ("recon", "id_recon", "ood_recon"),
     ("elbo", "id_elbo", "ood_elbo"),
-    ("knn", "id_knn", "ood_knn"),
-    ("mahalanobis", "id_mahalanobis", "ood_mahalanobis"),
+    ("latent_knn", "id_latent_knn", "ood_latent_knn"),
+    ("latent_mah", "id_latent_mah", "ood_latent_mah"),
     ("noise_single", "id_noise_single", "ood_noise_single"),
     ("noise_multi_mse", "id_noise_multi_mse", "ood_noise_multi_mse"),
     ("noise_multi_cosine", "id_noise_multi_cosine", "ood_noise_multi_cosine"),

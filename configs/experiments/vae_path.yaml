@@ -1,0 +1,23 @@
+experiment_name: vae_path
+
+model:
+  model_type: vae
+  latent_dim: 64
+  hidden_dim: 512
+  depth: 3
+
+training:
+  epochs: 150
+  lr: 1.0e-4
+  scheduler: cosine
+  warmup_epochs: 25
+  kl_weight: 1.0e-3
+  kl_warmup_epochs: 30
+
+ood:
+  primary_score: elbo
+  knn_k: 5
+
+wandb:
+  tags: [ood, vae, pathmnist]
+  save_code: false

@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -108,10 +109,6 @@ def _training_snapshot(
 ) -> None:
     fig = model.snapshot_fig(loaders, cfg, device, epoch, epochs)
     plt.show()
-    try:
-        run.log({f"train/snapshot/epoch_{epoch:03d}": wandb.Image(fig)})
-    except Exception as exc:
-        print(f"  W&B snapshot log failed: {exc}")
     plt.close(fig)
 
 
@@ -231,7 +228,9 @@ def train_model(
         run.log(wandb_payload)
 
         if scheduler is not None:
-            scheduler.step()
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="The epoch parameter in", category=UserWarning)
+                scheduler.step()
 
         if epoch % val_every == 0:
             val_loss = _validation_loss(model, loaders["id_eval"], device, kl_weight, ema=ema)

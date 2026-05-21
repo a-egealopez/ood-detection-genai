@@ -33,7 +33,7 @@ def run_summary(
         # Fallback: parse from experiment_id (folder name)
         experiment_id = fp.parent.name
         if not dataset:
-            m = re.search(r"_(mnist|sicap_c1|sicap_c12|moons|circles)_", experiment_id)
+            m = re.search(r"_(mnist|sicap_c1|sicap_c12|moons|blobs|pathmnist)_", experiment_id)
             if m:
                 dataset = m.group(1)
         if not lr:

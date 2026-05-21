@@ -15,7 +15,6 @@ def build_config(experiment: str, data: str) -> DictConfig:
     if not cfg.get("experiment_name"):
         raise ValueError("experiment_name is required but missing in config.")
 
-    OmegaConf.resolve(cfg)
     return cfg
 
 

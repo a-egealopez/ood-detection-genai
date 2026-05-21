@@ -18,11 +18,11 @@ class ScoreBundle:
     ood_recon: np.ndarray = field(default_factory=lambda: np.array([]))
     id_elbo: np.ndarray = field(default_factory=lambda: np.array([]))
     ood_elbo: np.ndarray = field(default_factory=lambda: np.array([]))
-    # VAE with latent / feature-space distance
-    id_knn: np.ndarray = field(default_factory=lambda: np.array([]))
-    ood_knn: np.ndarray = field(default_factory=lambda: np.array([]))
-    id_mahalanobis: np.ndarray = field(default_factory=lambda: np.array([]))
-    ood_mahalanobis: np.ndarray = field(default_factory=lambda: np.array([]))
+    # VAE latent-space distance
+    id_latent_knn: np.ndarray = field(default_factory=lambda: np.array([]))
+    ood_latent_knn: np.ndarray = field(default_factory=lambda: np.array([]))
+    id_latent_mah: np.ndarray = field(default_factory=lambda: np.array([]))
+    ood_latent_mah: np.ndarray = field(default_factory=lambda: np.array([]))
     # DDPM without latent
     id_noise_single: np.ndarray = field(default_factory=lambda: np.array([]))
     ood_noise_single: np.ndarray = field(default_factory=lambda: np.array([]))
