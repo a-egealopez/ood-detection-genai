@@ -402,6 +402,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 z_scores.append(
                     (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
+            # negate so higher score BECAUSE more OOD (z-score of similarity -> distance-like ranking in COSINE DISTANCE).
             return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if self.ood_reference is None or "mahalanobis_mean" not in self.ood_reference:

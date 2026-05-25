@@ -1,0 +1,50 @@
+{
+    "method": "vae",
+    "dataset": "mnist",
+    "seed": 42,
+    "lr": 0.0001,
+    "metrics": {
+        "recon": {
+            "auroc": 0.406838,
+            "aupr": 0.5828343176377364,
+            "fpr_at_95_tpr": 1.0
+        },
+        "elbo": {
+            "auroc": 0.391958,
+            "aupr": 0.5740788348229,
+            "fpr_at_95_tpr": 1.0
+        },
+        "latent_knn": {
+            "auroc": 0.90670025,
+            "aupr": 0.9280821314678498,
+            "fpr_at_95_tpr": 0.598
+        },
+        "latent_mah": {
+            "auroc": 0.9989870000000001,
+            "aupr": 0.9992631984033611,
+            "fpr_at_95_tpr": 0.0
+        }
+    },
+    "thresholds": {
+        "recon": {
+            "threshold": 0.13184748589992523,
+            "fpr": 0.05,
+            "tpr": 0.2385
+        },
+        "elbo": {
+            "threshold": 0.13617485761642456,
+            "fpr": 0.05,
+            "tpr": 0.2325
+        },
+        "latent_knn": {
+            "threshold": 6.031902313232422,
+            "fpr": 0.05,
+            "tpr": 0.728
+        },
+        "latent_mah": {
+            "threshold": 49.903594970703125,
+            "fpr": 0.05,
+            "tpr": 0.9965
+        }
+    }
+}

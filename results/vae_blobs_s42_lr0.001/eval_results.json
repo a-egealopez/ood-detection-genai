@@ -1,0 +1,50 @@
+{
+    "method": "vae",
+    "dataset": "blobs",
+    "seed": 42,
+    "lr": 0.001,
+    "metrics": {
+        "recon": {
+            "auroc": 1.0,
+            "aupr": 1.0,
+            "fpr_at_95_tpr": 0.0
+        },
+        "elbo": {
+            "auroc": 1.0,
+            "aupr": 1.0,
+            "fpr_at_95_tpr": 0.0
+        },
+        "latent_knn": {
+            "auroc": 1.0,
+            "aupr": 1.0,
+            "fpr_at_95_tpr": 0.0
+        },
+        "latent_mah": {
+            "auroc": 1.0,
+            "aupr": 1.0,
+            "fpr_at_95_tpr": 0.0
+        }
+    },
+    "thresholds": {
+        "recon": {
+            "threshold": 1.8665608167648315,
+            "fpr": 0.05,
+            "tpr": 1.0
+        },
+        "elbo": {
+            "threshold": 2.1676104068756104,
+            "fpr": 0.05,
+            "tpr": 1.0
+        },
+        "latent_knn": {
+            "threshold": 0.14082354307174683,
+            "fpr": 0.05,
+            "tpr": 1.0
+        },
+        "latent_mah": {
+            "threshold": 5.894484043121338,
+            "fpr": 0.05,
+            "tpr": 1.0
+        }
+    }
+}

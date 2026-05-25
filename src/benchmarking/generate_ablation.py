@@ -126,7 +126,11 @@ def run_t_ablation(
         ax.set_xlabel("n_score_steps (T)")
         ax.set_ylabel("AUROC")
         ax.set_xticks(t_vals)
-        ax.set_ylim(0.4, 1.0)
+        aurocs = grouped["auroc"].dropna()
+        if not aurocs.empty:
+            y_min, y_max = float(aurocs.min()), float(aurocs.max())
+            pad = 0.05 * (y_max - y_min) if y_max > y_min else 0.05
+            ax.set_ylim(max(0.0, y_min - pad), min(1.0, y_max + pad))
         ax.legend(fontsize=9)
         ax.grid(True, alpha=0.3)
 

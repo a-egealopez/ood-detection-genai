@@ -1,0 +1,50 @@
+{
+    "method": "vae",
+    "dataset": "moons",
+    "seed": 42,
+    "lr": 0.001,
+    "metrics": {
+        "recon": {
+            "auroc": 0.8822166666666666,
+            "aupr": 0.9641555846595535,
+            "fpr_at_95_tpr": 0.9
+        },
+        "elbo": {
+            "auroc": 0.8961766666666666,
+            "aupr": 0.9728457633464254,
+            "fpr_at_95_tpr": 0.98
+        },
+        "latent_knn": {
+            "auroc": 1.0,
+            "aupr": 1.0,
+            "fpr_at_95_tpr": 0.0
+        },
+        "latent_mah": {
+            "auroc": 0.9044933333333334,
+            "aupr": 0.9742219186951522,
+            "fpr_at_95_tpr": 0.7566666666666667
+        }
+    },
+    "thresholds": {
+        "recon": {
+            "threshold": 1.426759958267212,
+            "fpr": 0.05,
+            "tpr": 0.743
+        },
+        "elbo": {
+            "threshold": 1.524773359298706,
+            "fpr": 0.05,
+            "tpr": 0.809
+        },
+        "latent_knn": {
+            "threshold": 0.06652787327766418,
+            "fpr": 0.05,
+            "tpr": 1.0
+        },
+        "latent_mah": {
+            "threshold": 4.8017473220825195,
+            "fpr": 0.05,
+            "tpr": 0.773
+        }
+    }
+}

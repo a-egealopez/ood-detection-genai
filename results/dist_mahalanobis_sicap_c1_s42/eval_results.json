@@ -1,0 +1,18 @@
+{
+  "method": "mahalanobis",
+  "dataset": "sicap_c1",
+  "seed": 42,
+  "metrics": {
+    "mahalanobis": {
+      "auroc": 0.8348166649077754,
+      "aupr": 0.9290540446229627,
+      "fpr_at_95_tpr": 0.6157760814249363
+    },
+    "knn": {
+      "auroc": 0.6847715200337707,
+      "aupr": 0.8440437118065068,
+      "fpr_at_95_tpr": 0.7735368956743003
+    }
+  },
+  "thresholds": {}
+}
