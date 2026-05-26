@@ -67,7 +67,8 @@ def run_feature_distance(cfg, device: torch.device, out: str = "") -> Path:
         out_path = Path(out)
     else:
         experiment_id = build_experiment_id(cfg)
-        out_path = Path("results") / experiment_id / "eval_results.json"
+        eval_dir = Path(str(cfg.get("evaluation", {}).get("results_dir", Path("results") / experiment_id)))
+        out_path = eval_dir / "eval_results.json"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2))

@@ -49,7 +49,7 @@ def _parse_args():
     p.add_argument("--distance-type", choices=["knn", "mahalanobis"], default="knn")
     p.add_argument("--out", default="")
 
-    p.add_argument("--logs-dir", default="results")
+    p.add_argument("--logs-dir", default="results/evaluation")
     p.add_argument("--out-csv", default="results/summary/comparison.csv")
 
     args = p.parse_args()
@@ -85,6 +85,8 @@ def _mode_distance_method(args):
 
     short_name = build_experiment_id(cfg)
     cfg.experiment_name = short_name
+    cfg.evaluation = cfg.get("evaluation", {})
+    cfg.evaluation.results_dir = f"results/evaluation/{short_name}"
     print(f"{MODE_LABELS['distance-method']} [{args.distance_type}] — {short_name}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -96,6 +98,7 @@ def _mode_distance_method(args):
 
 def _mode_reconstruction_method(args):
     cfg = build_config(args.experiment, args.dataset)
+    cfg.evaluation = cfg.get("evaluation", {})
 
     if args.lr is not None:
         cfg.training.lr = args.lr
@@ -105,16 +108,23 @@ def _mode_reconstruction_method(args):
         cfg.seed = args.seed
 
     cfg.method = "reconstruction-method"
-
-    
     cfg.experiment_name = build_experiment_id(cfg)
+    train_experiment_id = str(cfg.experiment_name)
+    cfg.training.checkpoint_dir = f"results/training/{train_experiment_id}/checkpoints"
+    cfg.viz.train_plots_dir = f"results/training/{train_experiment_id}/plots"
 
 
     if args.n_score_steps is not None and str(cfg.model.get("model_type", "")) == "ddpm":
-        frozen_ckpt_dir = str(cfg.training.checkpoint_dir)  # resolves ${experiment_name} now
+        frozen_ckpt_dir = str(cfg.training.checkpoint_dir)
+        frozen_train_plots_dir = str(cfg.viz.train_plots_dir)
         cfg.model.n_score_steps = args.n_score_steps
-        cfg.training.checkpoint_dir = frozen_ckpt_dir        # pin to training-time path
-        cfg.experiment_name = build_experiment_id(cfg)       # now encodes the new T
+        cfg.training.checkpoint_dir = frozen_ckpt_dir
+        cfg.viz.train_plots_dir = frozen_train_plots_dir
+        cfg.experiment_name = build_experiment_id(cfg)
+
+    eval_experiment_id = str(cfg.experiment_name)
+    cfg.viz.eval_plots_dir = f"results/evaluation/{eval_experiment_id}/plots"
+    cfg.evaluation.results_dir = f"results/evaluation/{eval_experiment_id}"
 
     cfg.wandb.run_name = cfg.experiment_name
 
@@ -144,11 +154,13 @@ def _mode_reconstruction_method(args):
             model.load(str(ckpt_path), device)
             print(f"Loaded checkpoint: {ckpt_path}")
         else:
+            cfg.viz.plots_dir = str(cfg.viz.train_plots_dir)
             stg.stage_input_space_viz(ctx)
             torch.cuda.empty_cache()
             stg.stage_training(ctx)
 
         if not args.skip_eval:
+            cfg.viz.plots_dir = str(cfg.viz.eval_plots_dir)
             viz_key = "toy" if cfg.data.dataset in _TOY_DATASETS else cfg.model.model_type
             if visualize := RECON_VISUALIZERS.get(viz_key):
                 visualize(ctx)

@@ -17,7 +17,7 @@ training:
   early_stopping_patience: 20
   early_stopping_min_delta: 0.0
   viz_every_n_epochs: 50
-  checkpoint_dir: results/${experiment_name}/checkpoints/
+  checkpoint_dir: results/training/${experiment_name}/checkpoints/
 
 wandb:
   enabled: true
@@ -29,7 +29,9 @@ wandb:
   log_frequency: 10
 
 viz:
-  plots_dir: results/${experiment_name}/plots/
+  plots_dir: results/evaluation/${experiment_name}/plots/
+  train_plots_dir: results/training/${experiment_name}/plots/
+  eval_plots_dir: results/evaluation/${experiment_name}/plots/
   projectors: [pca, umap]
   pca_n_components: 50
   tsne_perplexity: 30
@@ -37,3 +39,6 @@ viz:
   umap_min_dist: 0.1
   umap_metric: euclidean
   umap_pca_init_components: 50
+
+evaluation:
+  results_dir: results/evaluation/${experiment_name}/

@@ -128,7 +128,8 @@ def evaluate_ood(
         "lr": float(cfg.training.lr),
         **results.to_dict(),
     }
-    out_path = Path("results") / experiment_id / "eval_results.json"
+    out_dir = Path(str(cfg.get("evaluation", {}).get("results_dir", Path("results") / experiment_id)))
+    out_path = out_dir / "eval_results.json"
     save_json(
         payload=payload,
         out_path=out_path,
