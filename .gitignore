@@ -56,6 +56,7 @@ Thumbs.db
 results/plots/
 results/summary/
 *.png
+*.pdf
 results/**/eval_results.json
 results/**/*.json
 *.json
