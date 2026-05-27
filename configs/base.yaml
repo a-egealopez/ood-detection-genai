@@ -32,6 +32,13 @@ viz:
   plots_dir: results/evaluation/${experiment_name}/plots/
   train_plots_dir: results/training/${experiment_name}/plots/
   eval_plots_dir: results/evaluation/${experiment_name}/plots/
+  # publication-friendly width in inches (approx. \textwidth)
+  textwidth_in: 6.0
+  # DPI to use for final saved PNGs
+  savefig_dpi: 300
+  recon_n_samples: 2
+  ddpm_timestep_grid_mode: compact
+  ddpm_denoising_trajectory_mode: compact
   projectors: [pca, umap]
   pca_n_components: 50
   tsne_perplexity: 30

@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
+
+from src.artifacts import save_figure
 
 REQUIRED_COLUMNS = [
     "experiment_id",
@@ -92,14 +95,18 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
     print(f"Saved → {tex_path}")
 
 
+def _bold_if_best(value: str, metric: float, best: float) -> str:
+    return rf"\textbf{{{value}}}" if pd.notna(metric) and metric == best else value
+
+
 def _write_tab11_tex(
     agg: pd.DataFrame, dist: pd.DataFrame, sicap_datasets: list[str], out: Path
 ) -> None:
-    n_cols = 5
+    n_cols = 9
     lines = [
-        r"\begin{tabular}{llccc}",
+        r"\begin{tabular}{lllrllccc}",
         r"\toprule",
-        r"Método & Config & AUROC & AUPR & FPR@95\% \\",
+        r"Método & LR & T & Score & Seed & N & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
     ]
     for i, dataset in enumerate(sicap_datasets):
@@ -107,37 +114,137 @@ def _write_tab11_tex(
             lines.append(r"\midrule")
         lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
         lines.append(r"\midrule")
+
+        rows_to_write = []
         for meth in ("knn", "mahalanobis"):
             rows = dist[(dist["dataset"] == dataset) & (dist["method"] == meth)]
             if rows.empty:
                 continue
             best = rows.loc[rows["auroc"].idxmax()]
-            cells = [
-                _escape_tex(meth),
-                f"seed={_fmt(best['seed'], '.0f')}",
-                _fmt(best["auroc"], ".4f"),
-                _fmt(best["aupr"], ".4f"),
-                _fmt(best["fpr_at_95_tpr"], ".4f"),
-            ]
-            lines.append(" & ".join(cells) + r" \\")
+            rows_to_write.append(
+                {
+                    "method": meth,
+                    "lr": "--",
+                    "t": "--",
+                    "score": "--",
+                    "seed": _fmt(best["seed"], ".0f"),
+                    "n": "1",
+                    "auroc": float(best["auroc"]),
+                    "aupr": float(best["aupr"]),
+                    "fpr": float(best["fpr_at_95_tpr"]),
+                }
+            )
         for meth in ("vae", "ddpm"):
             sub_agg = agg[(agg["dataset"] == dataset) & (agg["method"] == meth)]
             if sub_agg.empty:
                 continue
             b = sub_agg.loc[sub_agg["auroc_mean"].idxmax()]
-            t_str = f", T={int(b['t_steps'])}" if pd.notna(b["t_steps"]) else ""
-            cfg = rf"lr={_fmt(b['lr'], 'g')}{t_str}, score={_escape_tex(b['score'])}, N={int(b['auroc_count'])}"
+            rows_to_write.append(
+                {
+                    "method": meth,
+                    "lr": _fmt(b["lr"], "g"),
+                    "t": str(int(b["t_steps"])) if pd.notna(b["t_steps"]) else "--",
+                    "score": _escape_tex(b["score"]),
+                    "seed": _fmt(b["seed"], ".0f"),
+                    "n": str(int(b["auroc_count"])),
+                    "auroc": float(b["auroc_mean"]),
+                    "aupr": float(b["aupr_mean"]),
+                    "fpr": float(b["fpr_at_95_tpr_mean"]),
+                }
+            )
+
+        best_auroc = max((row["auroc"] for row in rows_to_write), default=float("nan"))
+        for row in rows_to_write:
             cells = [
-                _escape_tex(meth), cfg,
-                _tex_meanstd(b["auroc_mean"], b["auroc_std"]),
-                _tex_meanstd(b["aupr_mean"], b["aupr_std"]),
-                _tex_meanstd(b["fpr_at_95_tpr_mean"], b["fpr_at_95_tpr_std"]),
+                _escape_tex(row["method"]),
+                _escape_tex(row["lr"]),
+                _escape_tex(row["t"]),
+                _escape_tex(row["score"]),
+                _escape_tex(row["seed"]),
+                row["n"],
+                _bold_if_best(_fmt(row["auroc"], ".4f"), row["auroc"], best_auroc),
+                _fmt(row["aupr"], ".4f"),
+                _fmt(row["fpr"], ".4f"),
             ]
             lines.append(" & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{tabular}"]
     tex_path = out / "table_comparison_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Saved → {tex_path}")
+
+
+def _plot_sicap_methods(
+    agg: pd.DataFrame, dist: pd.DataFrame, sicap_datasets: list[str], out: Path
+) -> None:
+    methods = ["knn", "mahalanobis", "vae", "ddpm"]
+    colors = {
+        "knn": "gray",
+        "mahalanobis": "black",
+        "vae": "steelblue",
+        "ddpm": "darkorange",
+    }
+
+    fig, axes = plt.subplots(
+        1,
+        len(sicap_datasets),
+        figsize=(6 * len(sicap_datasets), 4),
+        squeeze=False,
+    )
+    for ax, dataset in zip(axes[0], sicap_datasets):
+        values = []
+        errors = []
+        labels = []
+        for meth in methods:
+            if meth in DISTANCE_METHODS:
+                rows = dist[(dist["dataset"] == dataset) & (dist["method"] == meth)]
+                if rows.empty:
+                    values.append(float("nan"))
+                    errors.append(0.0)
+                    labels.append(meth)
+                    continue
+                best = rows.loc[rows["auroc"].idxmax()]
+                values.append(float(best["auroc"]))
+                errors.append(0.0)
+                labels.append(meth)
+            else:
+                sub_agg = agg[(agg["dataset"] == dataset) & (agg["method"] == meth)]
+                if sub_agg.empty:
+                    values.append(float("nan"))
+                    errors.append(0.0)
+                    labels.append(meth)
+                    continue
+                b = sub_agg.loc[sub_agg["auroc_mean"].idxmax()]
+                values.append(float(b["auroc_mean"]))
+                errors.append(float(b["auroc_std"]))
+                labels.append(meth)
+
+        x = range(len(methods))
+        ax.bar(
+            x,
+            values,
+            yerr=errors,
+            capsize=4,
+            color=[colors[m] for m in methods],
+            alpha=0.85,
+            edgecolor="black",
+            linewidth=0.6,
+        )
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels)
+        ax.set_ylim(0.0, 1.0)
+        ax.set_ylabel("AUROC")
+        ax.set_title(dataset.upper(), fontsize=12, fontweight="bold")
+        ax.grid(True, alpha=0.2, axis="y")
+
+    plt.tight_layout()
+    save_figure(
+        fig,
+        out / "sicap_methods_comparison.png",
+        run=None,
+        image_key=None,
+        artifact_prefix="sicap-methods-comparison",
+    )
+    plt.close(fig)
 
 
 def run_aggregate_tables(
@@ -179,3 +286,4 @@ def run_aggregate_tables(
     dist = df[dist_mask].copy()
 
     _write_tab11_tex(agg, dist, sicap_datasets, out)
+    _plot_sicap_methods(agg, dist, sicap_datasets, out)

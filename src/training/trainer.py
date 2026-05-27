@@ -10,6 +10,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from tqdm.auto import tqdm
 
 import wandb
+from src.viz.style import apply_paper_style
 
 
 class EMA:
@@ -108,8 +109,25 @@ def _training_snapshot(
     run,
 ) -> None:
     fig = model.snapshot_fig(loaders, cfg, device, epoch, epochs)
-    plt.show()
-    plt.close(fig)
+    # persist the snapshot to disk and (optionally) W&B instead of showing
+    try:
+        from pathlib import Path
+        from src.artifacts import save_figure
+
+        plots_dir = Path(cfg.viz.get("train_plots_dir", "results/training/plots/"))
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        save_figure(
+            fig=fig,
+            out_path=plots_dir / f"training_snapshot_epoch_{epoch:03d}.png",
+            run=run if getattr(cfg, "wandb", {}).get("enabled", False) else None,
+            image_key=f"train/snapshot/epoch_{epoch}",
+            artifact_type="plot",
+            artifact_prefix="snapshot",
+            metadata={"epoch": epoch},
+            png_dpi=int(cfg.viz.get("savefig_dpi", 300)),
+        )
+    finally:
+        plt.close(fig)
 
 
 def _print_training_header(model: torch.nn.Module, cfg: DictConfig) -> None:
@@ -149,7 +167,7 @@ def train_model(
     cfg: DictConfig,
     device: torch.device,
     run=None,
-    viz_enabled: bool = True,
+    viz_enabled: bool = False,
 ) -> list[dict]:
     from src.artifacts import _NoOpRun
 
@@ -179,6 +197,11 @@ def train_model(
     )
 
     _print_training_header(model, cfg)
+    # apply paper style (uses cfg when available)
+    try:
+        apply_paper_style(cfg)
+    except Exception:
+        pass
     history: list[dict] = []
 
     for epoch in range(1, epochs + 1):

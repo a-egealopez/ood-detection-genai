@@ -16,9 +16,17 @@ from sklearn.preprocessing import StandardScaler
 
 import wandb
 from src.artifacts import save_figure
+from src.viz.style import apply_paper_style
 
 if TYPE_CHECKING:
     from src.evaluation.extract import ScoreBundle
+
+
+# apply a consistent plotting style at import time
+try:
+    apply_paper_style(None)
+except Exception:
+    pass
 
 
 def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) -> None:
@@ -53,7 +61,7 @@ def _plot_score_distribution(
             kde = gaussian_kde(s, bw_method=0.3)
             xs = np.linspace(s.min(), s.max(), 300)
             ax.plot(xs, kde(xs), color=c, linewidth=2)
-    ax.set_title(f"Score Distribution [{mode}]  AUROC={auroc:.4f}", fontsize=11, fontweight="bold")
+    ax.set_title(f"Score Distribution — {mode}", fontsize=11, fontweight="bold")
     ax.set_xlabel("OOD Score (higher = more OOD)")
     ax.set_ylabel("Density")
     ax.legend()
@@ -65,9 +73,9 @@ def _plot_roc_curve(
 ) -> None:
     y = np.concatenate([np.zeros(len(id_scores)), np.ones(len(ood_scores))])
     fpr, tpr, _ = roc_curve(y, np.concatenate([id_scores, ood_scores]))
-    ax.plot(fpr, tpr, color="darkorange", lw=2, label=f"ROC [{mode}]  AUROC={auroc:.4f}")
+    ax.plot(fpr, tpr, color="darkorange", lw=2, label=f"AUROC = {auroc:.4f}")
     ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random")
-    ax.set_title(f"ROC Curve [{mode}]", fontsize=11, fontweight="bold")
+    ax.set_title(f"ROC Curve — {mode}", fontsize=11, fontweight="bold")
     ax.set_xlabel("FPR")
     ax.set_ylabel("TPR")
     ax.legend()
@@ -88,46 +96,59 @@ def plot_ood_evaluation(
     active: list[tuple[str, str, str]],
     run=None,
     plots_dir: Path | None = None,
+    cfg: DictConfig | None = None,
 ) -> None:
-    """Render score distribution and ROC figures, one figure per predefined score group."""
+    """Render score distribution and ROC figures.
+
+    Generate one compact figure per scoring mode (distribution + ROC), sized for
+    publication using `cfg.viz.textwidth_in` when available.
+    """
     active_set = {m for m, _, _ in active}
     active_map = {m: (id_a, ood_a) for m, id_a, ood_a in active}
+
+    # determine target width from cfg
+    textwidth = 6.0
+    try:
+        if cfg is not None:
+            textwidth = float(cfg.viz.get("textwidth_in", textwidth))
+    except Exception:
+        pass
 
     for group in _SCORE_GROUPS:
         chunk = [(m, *active_map[m]) for m in group if m in active_set]
         if not chunk:
             continue
-        mode_names = "+".join(m for m, _, _ in chunk)
 
-        fig, axes = plt.subplots(len(chunk), 2, figsize=(16, 5 * len(chunk)))
-        if len(chunk) == 1:
-            axes = axes[np.newaxis, :]
-        fig.suptitle(f"OOD Evaluation — {mode_names}", fontsize=14, fontweight="bold")
+        # render one figure per active mode for clarity and publication sizing
+        for mode, id_attr, ood_attr in chunk:
+            fig, axes = plt.subplots(1, 2, figsize=(textwidth, 3.5))
+            fig.suptitle(f"OOD Score Evaluation — {mode}", fontsize=14, fontweight="bold")
 
-        for row, (mode, id_attr, ood_attr) in enumerate(chunk):
             _plot_score_distribution(
                 getattr(scores, id_attr), getattr(scores, ood_attr),
-                mode, aurocs[mode], axes[row, 0],
+                mode, aurocs.get(mode, float("nan")), axes[0],
             )
             _plot_roc_curve(
                 getattr(scores, id_attr), getattr(scores, ood_attr),
-                mode, aurocs[mode], axes[row, 1],
+                mode, aurocs.get(mode, float("nan")), axes[1],
             )
 
-        plt.tight_layout()
-        if plots_dir is not None:
-            save_figure(
-                fig=fig,
-                out_path=plots_dir / f"ood_scores_{mode_names}.png",
-                run=run,
-                image_key=f"eval/ood_scores/{mode_names}",
-                artifact_type="plot",
-                artifact_prefix="ood-scores",
-                metadata={"modes": mode_names},
-            )
-        elif run is not None:
-            run.log({f"eval/ood_scores/{mode_names}": wandb.Image(fig)})
-        plt.close(fig)
+            plt.tight_layout()
+            mode_name = mode
+            if plots_dir is not None:
+                save_figure(
+                    fig=fig,
+                    out_path=plots_dir / f"ood_scores_{mode_name}.png",
+                    run=run,
+                    image_key=f"eval/ood_scores/{mode_name}",
+                    artifact_type="plot",
+                    artifact_prefix="ood-scores",
+                    metadata={"modes": mode_name},
+                    png_dpi=int(cfg.viz.get("savefig_dpi", 300)) if cfg is not None else 300,
+                )
+            elif run is not None:
+                run.log({f"eval/ood_scores/{mode_name}": wandb.Image(fig)})
+            plt.close(fig)
 
 
 def _standardize_scale(zs: np.ndarray) -> np.ndarray:
@@ -245,7 +266,14 @@ def plot_embeddings(
     if unknown:
         raise ValueError(f"Unknown projector(s): {unknown}. Available: {list(PROJECTOR_REGISTRY)}")
 
-    fig, axes = plt.subplots(1, len(projectors), figsize=(8 * len(projectors), 6))
+    # use configured textwidth and compact height for publication figures
+    textwidth = 6.0
+    try:
+        textwidth = float(cfg.viz.get("textwidth_in", textwidth))
+    except Exception:
+        pass
+    width = textwidth * len(projectors)
+    fig, axes = plt.subplots(1, len(projectors), figsize=(width, 3.5))
     if len(projectors) == 1:
         axes = [axes]
     fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)

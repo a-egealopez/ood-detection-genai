@@ -71,18 +71,40 @@ def save_figure(
     artifact_type: str = "plot",
     artifact_prefix: str = "plot",
     metadata: dict[str, Any] | None = None,
+    save_vector_formats: list[str] | None = None,
+    png_dpi: int = 300,
 ) -> Path:
     """Save figure locally and optionally log image + artifact to W&B."""
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    # normalize target paths: ensure a PNG is always created, and optionally
+    # create vector formats (PDF) for publication-quality export.
+    if save_vector_formats is None:
+        save_vector_formats = ["pdf"]
+
+    # decide base png path
+    if out.suffix == "":
+        out = out.with_suffix(".png")
+
+    out_png = out.with_suffix(".png")
+    fig.savefig(out_png, dpi=png_dpi, bbox_inches="tight")
+
+    # export vector formats if requested
+    for fmt in save_vector_formats:
+        try:
+            out_vec = out.with_suffix(f".{fmt}")
+            fig.savefig(out_vec, bbox_inches="tight")
+        except Exception:
+            # non-fatal: continue if a format can't be written
+            pass
     if run is not None:
         if image_key:
             run.log({image_key: wandb.Image(fig)})
+        # log the PNG as the canonical artifact
         _log_artifact(
-            run, _slug(f"{artifact_prefix}-{out.stem}"), artifact_type, out, metadata or {}
+            run, _slug(f"{artifact_prefix}-{out_png.stem}"), artifact_type, out_png, metadata or {}
         )
-    return out
+    return out_png
 
 
 def save_json(

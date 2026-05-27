@@ -12,6 +12,7 @@ import src.evaluation as eval
 import src.training as train
 from src.artifacts import save_figure
 from src.evaluation.plot import plot_ood_evaluation, project_pca, render_cell
+from src.viz.style import apply_paper_style
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,10 @@ class DatasetMetadata:
 
 def stage_input_space_viz(ctx: StageContext) -> None:
     metadata = DatasetMetadata.from_cfg(ctx.cfg)
+    try:
+        apply_paper_style(ctx.cfg)
+    except Exception:
+        pass
 
     id_vecs, id_labels = _collect_raw_vectors(ctx.loaders["id_eval"])
     ood_vecs, _ = _collect_raw_vectors(ctx.loaders["ood_eval"])
@@ -60,6 +65,7 @@ def stage_input_space_viz(ctx: StageContext) -> None:
             id_labels,
             ctx.cfg,
             title=f"Input Space — {metadata.id_name} (ID)",
+            projectors=["pca"],
             label_map={i: str(i) for i in range(metadata.ood_label)},
             ood_label=None,
         ),
@@ -73,6 +79,7 @@ def stage_input_space_viz(ctx: StageContext) -> None:
             combined_labels,
             ctx.cfg,
             title=f"Input Space — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+            projectors=["pca"],
             label_map=metadata.label_map,
             ood_label=metadata.ood_label,
         ),
@@ -87,18 +94,35 @@ def stage_training(ctx: StageContext) -> list[dict]:
     loss_keys = list(history[0].keys())
     epochs = range(1, len(history) + 1)
     colors = ["steelblue", "darkorange", "mediumseagreen", "tomato", "orchid"]
+    textwidth = 6.0
+    try:
+        textwidth = float(ctx.cfg.viz.get("textwidth_in", textwidth))
+    except Exception:
+        pass
 
-    fig, axes = plt.subplots(1, len(loss_keys), figsize=(6 * len(loss_keys), 4))
+    max_cols = 2
+    n_cols = min(len(loss_keys), max_cols)
+    n_rows = (len(loss_keys) + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(textwidth, 3.5 * n_rows),
+        squeeze=False,
+    )
     fig.suptitle("Training Loss History", fontsize=14, fontweight="bold")
 
-    for ax, key, color in zip(np.atleast_1d(axes), loss_keys, colors, strict=False):
+    axes_flat = list(np.atleast_1d(axes).reshape(-1))
+    for ax, key, color in zip(axes_flat, loss_keys, colors, strict=False):
         vals = [h[key] for h in history]
         ax.plot(epochs, vals, color=color, lw=2)
-        ax.fill_between(epochs, vals, color=color, alpha=0.15)
+        ax.fill_between(epochs, vals, color=color, alpha=0.05)
         ax.set_title(key.capitalize(), fontsize=11)
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Loss")
-        ax.grid(True, alpha=0.3)
+        ax.grid(True, alpha=0.2)
+
+    for ax in axes_flat[len(loss_keys) :]:
+        ax.axis("off")
 
     plt.tight_layout()
     _show_save_log(fig, ctx, "training_curves.png", "train/curves")
@@ -118,28 +142,43 @@ def stage_reconstruction_viz_toy(ctx: StageContext) -> None:
 
 def stage_reconstruction_viz_vae(ctx: StageContext) -> None:
     metadata = DatasetMetadata.from_cfg(ctx.cfg)
+    # compact version (for body)
+    orig_n = ctx.cfg.viz.get("recon_n_samples", 2)
+    ctx.cfg.viz["recon_n_samples"] = int(ctx.cfg.viz.get("recon_n_samples_compact", 2))
     _show_save_log(
         _build_reconstruction_fig_vae(ctx, metadata),
         ctx,
-        "reconstructions.png",
-        "eval/reconstructions",
+        "reconstructions_compact.png",
+        "eval/reconstructions_compact",
     )
+    # full version (for appendix)
+    ctx.cfg.viz["recon_n_samples"] = int(ctx.cfg.viz.get("recon_n_samples_full", 8))
+    _show_save_log(
+        _build_reconstruction_fig_vae(ctx, metadata),
+        ctx,
+        "reconstructions_full.png",
+        "eval/reconstructions_full",
+    )
+    ctx.cfg.viz["recon_n_samples"] = orig_n
 
 
 def stage_reconstruction_viz_ddpm(ctx: StageContext) -> None:
     metadata = DatasetMetadata.from_cfg(ctx.cfg)
-    _show_save_log(
-        _build_ddpm_timestep_grid(ctx, metadata),
-        ctx,
-        "ddpm_timestep_grid.png",
-        "eval/ddpm_timestep_grid",
-    )
-    _show_save_log(
-        _build_ddpm_denoising_trajectory(ctx, metadata),
-        ctx,
-        "ddpm_denoising_trajectory.png",
-        "eval/ddpm_denoising_trajectory",
-    )
+    for grid_mode, grid_suffix in [("compact", "_compact"), ("full", "_full")]:
+        ctx.cfg.viz["ddpm_timestep_grid_mode"] = grid_mode
+        _show_save_log(
+            _build_ddpm_timestep_grid(ctx, metadata),
+            ctx,
+            f"ddpm_timestep_grid{grid_suffix}.png",
+            f"eval/ddpm_timestep_grid{grid_suffix}",
+        )
+        ctx.cfg.viz["ddpm_denoising_trajectory_mode"] = grid_mode
+        _show_save_log(
+            _build_ddpm_denoising_trajectory(ctx, metadata),
+            ctx,
+            f"ddpm_denoising_trajectory{grid_suffix}.png",
+            f"eval/ddpm_denoising_trajectory{grid_suffix}",
+        )
 
 
 def stage_evaluation(ctx: StageContext):
@@ -163,7 +202,7 @@ def stage_evaluation(ctx: StageContext):
     embeddings_ood, _ = eval.extract_representations(ctx.model, ctx.loaders["ood_eval"], ctx.device)
 
     if bool(ctx.cfg.viz.get("plot_embeddings", True)):
-        eval.plot_embeddings(
+        fig = eval.plot_embeddings(
             np.concatenate([embeddings_id, embeddings_ood]),
             np.concatenate([labels_id, np.full(len(embeddings_ood), metadata.ood_label)]),
             ctx.cfg,
@@ -174,8 +213,7 @@ def stage_evaluation(ctx: StageContext):
             wandb_key="eval/embedding_vs_ood",
             save_name="embedding_vs_ood",
         )
-        plt.show()
-        plt.close()
+        plt.close(fig)
 
     if str(ctx.cfg.model.model_type) == "vae":
         raw_vecs, raw_labs, recon_vecs, recon_labs = _collect_recon_vectors(ctx)
@@ -187,7 +225,7 @@ def stage_evaluation(ctx: StageContext):
     active = _active_modes(scores)
     aurocs = {mode: results.metrics[mode]["auroc"] for mode in results.metrics}
     plots_dir = Path(ctx.cfg.viz.plots_dir)
-    plot_ood_evaluation(scores, aurocs, active, run=ctx.run, plots_dir=plots_dir)
+    plot_ood_evaluation(scores, aurocs, active, run=ctx.run, plots_dir=plots_dir, cfg=ctx.cfg)
 
     ctx.run.log({"eval/status": "complete"})
     return results
@@ -225,7 +263,7 @@ def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Fi
     model_type = ctx.cfg.model.model_type.upper()
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     fig.suptitle(
-        f"[{model_type}] Original vs Reconstructed — "
+        f"[{model_type}] Input and Reconstructed Distributions — "
         f"{metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
         fontsize=13, fontweight="bold",
     )
@@ -251,39 +289,43 @@ def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Fi
 
 def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata) -> plt.Figure:
     ctx.model.eval()
-    x_id = next(iter(ctx.loaders["id_eval"]))[0][:8].to(ctx.device)
-    x_ood = next(iter(ctx.loaders["ood_eval"]))[0][:8].to(ctx.device)
+    n_samples = int(ctx.cfg.viz.get("recon_n_samples", 2))
+    x_id = next(iter(ctx.loaders["id_eval"]))[0][:n_samples].to(ctx.device)
+    x_ood = next(iter(ctx.loaders["ood_eval"]))[0][:n_samples].to(ctx.device)
     with torch.no_grad():
         x_recon_id, _, _ = ctx.model(x_id)
         x_recon_ood, _, _ = ctx.model(x_ood)
 
     is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
+    textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
-    fig, axes = plt.subplots(4, 8, figsize=(16, 9))
+    fig, axes = plt.subplots(2, n_samples * 2, figsize=(textwidth, 5.5), squeeze=False)
     fig.suptitle(
-        f"[{model_type}] Original vs Reconstructed — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+        f"[{model_type}] Reconstruction Quality — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
         fontsize=13,
         fontweight="bold",
     )
 
-    for row, (title, batch, color) in enumerate(
-        [
-            (f"{metadata.id_name} original", x_id, "steelblue"),
-            (f"{metadata.id_name} reconstructed", x_recon_id, "steelblue"),
-            (f"{metadata.ood_name} original", x_ood, "tomato"),
-            (f"{metadata.ood_name} reconstructed", x_recon_ood, "tomato"),
-        ]
-    ):
-        axes[row, 0].set_ylabel(title, fontsize=9, fontweight="bold", color=color)
-        for col in range(8):
-            render_cell(axes[row, col], batch[col].cpu(), is_image, color)
+    for col in range(n_samples):
+        axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
+        render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue")
+        axes[1, col].set_ylabel("ID reconstructed", fontsize=9, fontweight="bold", color="steelblue")
+        render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue")
+
+    for col in range(n_samples, n_samples * 2):
+        idx = col - n_samples
+        axes[0, col].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
+        render_cell(axes[0, col], x_ood[idx].cpu(), is_image, "tomato")
+        axes[1, col].set_ylabel("OOD reconstructed", fontsize=9, fontweight="bold", color="tomato")
+        render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato")
 
     fig.text(
-        0.99, 0.75, "ID", fontsize=14, fontweight="bold", color="steelblue", va="center", ha="right"
-    )
-    fig.text(
-        0.99, 0.28, "OOD", fontsize=14, fontweight="bold", color="tomato", va="center", ha="right"
+        0.5,
+        0.01,
+        "Columns = 1..N ID samples followed by 1..N OOD samples.",
+        ha="center",
+        fontsize=9,
     )
     plt.tight_layout()
     return fig
@@ -293,59 +335,101 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
     ctx.model.eval()
 
     max_t = int(ctx.model.num_train_timesteps) - 1
-    keyframes = _ddpm_keyframes(max_t)
-
-    x_id = next(iter(ctx.loaders["id_eval"]))[0][: len(keyframes)].to(ctx.device)
-    x_ood = next(iter(ctx.loaders["ood_eval"]))[0][: len(keyframes)].to(ctx.device)
-
-    t_values = torch.tensor(keyframes, device=ctx.device, dtype=torch.long)[: x_id.shape[0]]
-
-    with torch.no_grad():
-        x_recon_id, x_noisy_id, _ = ctx.model.reconstruct_at_t(
-            x_id, t_values, noise=torch.randn_like(x_id)
-        )
-        x_recon_ood, x_noisy_ood, _ = ctx.model.reconstruct_at_t(
-            x_ood, t_values, noise=torch.randn_like(x_ood)
-        )
-
+    mode = str(ctx.cfg.viz.get("ddpm_timestep_grid_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
-    n_cols = len(keyframes) + 1
+    textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
-    fig, axes = plt.subplots(6, n_cols, figsize=(2.1 * n_cols, 12))
+    if mode == "full":
+        keyframes = _ddpm_keyframes(max_t)
+        x_id = next(iter(ctx.loaders["id_eval"]))[0][: len(keyframes)].to(ctx.device)
+        x_ood = next(iter(ctx.loaders["ood_eval"]))[0][: len(keyframes)].to(ctx.device)
+        t_values = torch.tensor(keyframes, device=ctx.device, dtype=torch.long)[: x_id.shape[0]]
+        noise_id = ctx.model._fixed_noise(x_id.shape, ctx.device)
+        noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
+        with torch.no_grad():
+            x_recon_id, x_noisy_id, _ = ctx.model.reconstruct_at_t(x_id, t_values, noise=noise_id)
+            x_recon_ood, x_noisy_ood, _ = ctx.model.reconstruct_at_t(x_ood, t_values, noise=noise_ood)
+
+        n_cols = len(keyframes) + 1
+        fig, axes = plt.subplots(6, n_cols, figsize=(2.1 * n_cols, 12))
+        fig.suptitle(
+            f"[{model_type}] Diffusion Process Across Timesteps — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+            fontsize=15,
+            fontweight="bold",
+        )
+
+        for row, (title, batch, color, t_vals) in enumerate(
+            [
+                (f"{metadata.id_name} Original", x_id, "steelblue", None),
+                (f"{metadata.id_name} Noisy (x_t)", x_noisy_id, "steelblue", t_values),
+                (f"{metadata.id_name} Reconstructed", x_recon_id, "steelblue", t_values),
+                (f"{metadata.ood_name} Original", x_ood, "tomato", None),
+                (f"{metadata.ood_name} Noisy (x_t)", x_noisy_ood, "tomato", t_values),
+                (f"{metadata.ood_name} Reconstructed", x_recon_ood, "tomato", t_values),
+            ]
+        ):
+            axes[row, 0].set_ylabel(title, fontsize=9, fontweight="bold", color=color)
+            render_cell(axes[row, 0], batch[0].cpu(), is_image, color)
+            for col in range(len(keyframes)):
+                ax = axes[row, col + 1]
+                render_cell(ax, batch[col].cpu(), is_image, color)
+                if t_vals is not None:
+                    ax.set_title(f"t={t_vals[col].item()}", fontsize=7, color=color, pad=2)
+
+        fig.text(
+            0.99, 0.75, "ID", fontsize=16, fontweight="bold", color="steelblue", va="center", ha="right"
+        )
+        fig.text(
+            0.99, 0.25, "OOD", fontsize=16, fontweight="bold", color="tomato", va="center", ha="right"
+        )
+        plt.tight_layout(rect=[0, 0, 0.98, 0.97])
+        return fig
+
+    # compact version for memory-friendly figures
+    compact_steps = [1, max(1, max_t // 2), max_t]
+    x_id = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
+    x_ood = next(iter(ctx.loaders["ood_eval"]))[0][:1].to(ctx.device)
+    noise_id = ctx.model._fixed_noise(x_id.shape, ctx.device)
+    noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
+
+    x_noisy_id = []
+    for t in compact_steps[:-1]:
+        t_tensor = torch.full((1,), t, device=ctx.device, dtype=torch.long)
+        x_noisy_id.append(ctx.model.scheduler.add_noise(x_id, noise_id, t_tensor))
+    x_recon_id, _, _ = ctx.model.reconstruct_at_t(x_id, torch.tensor([compact_steps[-1]], device=ctx.device), noise=noise_id)
+
+    x_noisy_ood = []
+    for t in compact_steps[:-1]:
+        t_tensor = torch.full((1,), t, device=ctx.device, dtype=torch.long)
+        x_noisy_ood.append(ctx.model.scheduler.add_noise(x_ood, noise_ood, t_tensor))
+    x_recon_ood, _, _ = ctx.model.reconstruct_at_t(x_ood, torch.tensor([compact_steps[-1]], device=ctx.device), noise=noise_ood)
+
+    n_cols = len(compact_steps) + 1
+    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth, 4.5), squeeze=False)
     fig.suptitle(
-        f"[{model_type}] Diffusion Process over timesteps — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-        fontsize=15,
+        f"[{model_type}] DDPM Timestep Grid — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+        fontsize=14,
         fontweight="bold",
     )
 
-    for row, (title, batch, color, t_vals) in enumerate(
-        [
-            (f"{metadata.id_name} Original", x_id, "steelblue", None),
-            (f"{metadata.id_name} Noisy (x_t)", x_noisy_id, "steelblue", t_values),
-            (f"{metadata.id_name} Reconstructed", x_recon_id, "steelblue", t_values),
-            (f"{metadata.ood_name} Original", x_ood, "tomato", None),
-            (f"{metadata.ood_name} Noisy (x_t)", x_noisy_ood, "tomato", t_values),
-            (f"{metadata.ood_name} Reconstructed", x_recon_ood, "tomato", t_values),
-        ]
-    ):
-        axes[row, 0].set_ylabel(title, fontsize=9, fontweight="bold", color=color)
+    axes[0, 0].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
+    render_cell(axes[0, 0], x_id[0].cpu(), is_image, "steelblue")
+    for idx, t in enumerate(compact_steps[:-1], start=1):
+        render_cell(axes[0, idx], x_noisy_id[idx - 1][0].cpu(), is_image, "steelblue")
+        axes[0, idx].set_title(f"x_t (t={t})", fontsize=8)
+    render_cell(axes[0, -1], x_recon_id[0].cpu(), is_image, "steelblue")
+    axes[0, -1].set_title(f"Reconstructed (t={compact_steps[-1]})", fontsize=8)
 
-        render_cell(axes[row, 0], batch[0].cpu(), is_image, color)
+    axes[1, 0].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
+    render_cell(axes[1, 0], x_ood[0].cpu(), is_image, "tomato")
+    for idx, t in enumerate(compact_steps[:-1], start=1):
+        render_cell(axes[1, idx], x_noisy_ood[idx - 1][0].cpu(), is_image, "tomato")
+        axes[1, idx].set_title(f"x_t (t={t})", fontsize=8)
+    render_cell(axes[1, -1], x_recon_ood[0].cpu(), is_image, "tomato")
+    axes[1, -1].set_title(f"Reconstructed (t={compact_steps[-1]})", fontsize=8)
 
-        for col in range(len(keyframes)):
-            ax = axes[row, col + 1]
-            render_cell(ax, batch[col].cpu(), is_image, color)
-            if t_vals is not None:
-                ax.set_title(f"t={t_vals[col].item()}", fontsize=7, color=color, pad=2)
-
-    fig.text(
-        0.99, 0.75, "ID", fontsize=16, fontweight="bold", color="steelblue", va="center", ha="right"
-    )
-    fig.text(
-        0.99, 0.25, "OOD", fontsize=16, fontweight="bold", color="tomato", va="center", ha="right"
-    )
-    plt.tight_layout(rect=[0, 0, 0.98, 0.97])
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
     return fig
 
 
@@ -353,52 +437,94 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
     ctx.model.eval()
 
     max_t = int(ctx.model.num_train_timesteps / 2)
-    keyframes = _ddpm_keyframes(max_t)
-
-    x_id = next(iter(ctx.loaders["id_eval"]))[0][: len(keyframes)].to(ctx.device)
-    x_ood = next(iter(ctx.loaders["ood_eval"]))[0][: len(keyframes)].to(ctx.device)
-
-    tensor_n_steps = torch.tensor(keyframes, device=ctx.device, dtype=torch.long)
-    tensor_n_steps = tensor_n_steps[(tensor_n_steps >= 0) & (tensor_n_steps <= max_t)]
-    n_steps = int(tensor_n_steps.shape[0])
-
-    x_ref_id = x_id[:4]
-    x_ref_ood = x_ood[:4]
-    t_start = int(tensor_n_steps.max().item())
-    captures = [int(t.item()) for t in tensor_n_steps]
-    traj_id = ctx.model.denoise_trajectory(
-        x_ref_id, t_start=t_start, capture_timesteps=captures, noise=torch.randn_like(x_ref_id)
-    )
-    traj_ood = ctx.model.denoise_trajectory(
-        x_ref_ood, t_start=t_start, capture_timesteps=captures, noise=torch.randn_like(x_ref_ood)
-    )
-
+    mode = str(ctx.cfg.viz.get("ddpm_denoising_trajectory_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
-    n_rows = x_ref_id.shape[0] + x_ref_ood.shape[0]
+    textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
-    fig, axes = plt.subplots(n_rows, n_steps + 1, figsize=(2.0 * (n_steps + 1), 1.9 * n_rows))
+    if mode == "full":
+        keyframes = _ddpm_keyframes(max_t)
+        x_id = next(iter(ctx.loaders["id_eval"]))[0][: len(keyframes)].to(ctx.device)
+        x_ood = next(iter(ctx.loaders["ood_eval"]))[0][: len(keyframes)].to(ctx.device)
+
+        tensor_n_steps = torch.tensor(keyframes, device=ctx.device, dtype=torch.long)
+        tensor_n_steps = tensor_n_steps[(tensor_n_steps >= 0) & (tensor_n_steps <= max_t)]
+        n_steps = int(tensor_n_steps.shape[0])
+
+        x_ref_id = x_id[:4]
+        x_ref_ood = x_ood[:4]
+        t_start = int(tensor_n_steps.max().item())
+        captures = [int(t.item()) for t in tensor_n_steps]
+        traj_id = ctx.model.denoise_trajectory(
+            x_ref_id, t_start=t_start, capture_timesteps=captures, noise=torch.randn_like(x_ref_id)
+        )
+        traj_ood = ctx.model.denoise_trajectory(
+            x_ref_ood, t_start=t_start, capture_timesteps=captures, noise=torch.randn_like(x_ref_ood)
+        )
+
+        n_rows = x_ref_id.shape[0] + x_ref_ood.shape[0]
+        fig, axes = plt.subplots(n_rows, n_steps + 1, figsize=(2.0 * (n_steps + 1), 1.9 * n_rows))
+        fig.suptitle(
+            f"[{model_type}] Reverse Denoising Trajectory — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+            fontsize=14,
+            fontweight="bold",
+        )
+
+        for r in range(n_rows):
+            is_ood_row = r >= x_ref_id.shape[0]
+            local_r = r - x_ref_id.shape[0] if is_ood_row else r
+            x_ref = x_ref_ood if is_ood_row else x_ref_id
+            traj = traj_ood if is_ood_row else traj_id
+            color = "tomato" if is_ood_row else "steelblue"
+            tag = "OOD" if is_ood_row else "ID"
+
+            render_cell(axes[r, 0], x_ref[local_r].cpu(), is_image, color)
+            axes[r, 0].set_title(f"{tag} x (orig)", fontsize=8, color=color)
+
+            for c, t in enumerate(reversed(tensor_n_steps.tolist()), start=1):
+                token = f"x_t (t={t})" if t > 0 else "x_0 (final)"
+                render_cell(axes[r, c], traj[int(t)][local_r].cpu(), is_image, color)
+                axes[r, c].set_title(f"{tag} {token}", fontsize=8, color=color)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        return fig
+
+    # compact default: one ID + one OOD row and a few timestep snapshots
+    x_id = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
+    x_ood = next(iter(ctx.loaders["ood_eval"]))[0][:1].to(ctx.device)
+    capture_timesteps = [max_t, max(1, max_t // 2), 0]
+    noise_id = ctx.model._fixed_noise(x_id.shape, ctx.device)
+    noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
+
+    traj_id = ctx.model.denoise_trajectory(
+        x_id,
+        t_start=capture_timesteps[0],
+        capture_timesteps=capture_timesteps,
+        noise=noise_id,
+    )
+    traj_ood = ctx.model.denoise_trajectory(
+        x_ood,
+        t_start=capture_timesteps[0],
+        capture_timesteps=capture_timesteps,
+        noise=noise_ood,
+    )
+
+    fig, axes = plt.subplots(2, len(capture_timesteps) + 1, figsize=(textwidth, 5.5), squeeze=False)
     fig.suptitle(
-        f"[{model_type}] Real Reverse Denoising — ID vs OOD (high t -> low t)",
+        f"[{model_type}] Denoising Trajectory — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
         fontsize=14,
         fontweight="bold",
     )
 
-    for r in range(n_rows):
-        is_ood_row = r >= x_ref_id.shape[0]
-        local_r = r - x_ref_id.shape[0] if is_ood_row else r
-        x_ref = x_ref_ood if is_ood_row else x_ref_id
-        traj = traj_ood if is_ood_row else traj_id
-        color = "tomato" if is_ood_row else "steelblue"
-        tag = "OOD" if is_ood_row else "ID"
-
-        render_cell(axes[r, 0], x_ref[local_r].cpu(), is_image, color)
-        axes[r, 0].set_title(f"{tag} x (orig)", fontsize=8, color=color)
-
-        for c, t in enumerate(reversed(tensor_n_steps.tolist()), start=1):
-            token = f"x_t (t={t})" if t > 0 else "x_0 (final)"
-            render_cell(axes[r, c], traj[int(t)][local_r].cpu(), is_image, color)
-            axes[r, c].set_title(f"{tag} {token}", fontsize=8, color=color)
+    for row, (x_ref, traj, color, tag) in enumerate(
+        [(x_id, traj_id, "steelblue", "ID"), (x_ood, traj_ood, "tomato", "OOD")]
+    ):
+        render_cell(axes[row, 0], x_ref[0].cpu(), is_image, color)
+        axes[row, 0].set_title(f"{tag} original", fontsize=9, color=color)
+        for c, t in enumerate(reversed(capture_timesteps), start=1):
+            token = "x_0 (final)" if t == 0 else f"x_t (t={t})"
+            render_cell(axes[row, c], traj[int(t)][0].cpu(), is_image, color)
+            axes[row, c].set_title(token, fontsize=8)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
@@ -412,7 +538,13 @@ def _ddpm_keyframes(max_t: int) -> list[int]:
     return frames[::-1]
 
 
-def _show_save_log(fig, ctx: StageContext, filename: str, wandb_key: str) -> None:
+def _show_save_log(
+    fig,
+    ctx: StageContext,
+    filename: str,
+    wandb_key: str,
+    save_vector_formats: list[str] | None = None,
+) -> None:
     if ctx.cfg.viz.get("show_plots", False):
         plt.show()
 
@@ -430,6 +562,8 @@ def _show_save_log(fig, ctx: StageContext, filename: str, wandb_key: str) -> Non
             "model_type": str(ctx.cfg.model.model_type),
             "dataset": str(ctx.cfg.data.dataset),
         },
+        save_vector_formats=save_vector_formats,
+        png_dpi=int(ctx.cfg.viz.get("savefig_dpi", 300)),
     )
     plt.close(fig)
 
@@ -472,9 +606,10 @@ def _plot_embedding_panel(
 ) -> None:
     model_type = ctx.cfg.model.model_type.upper()
     cmap = plt.colormaps["tab10"].resampled(10)
-    fig, axs = plt.subplots(1, 3, figsize=(24, 6))
+    textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
+    fig, axs = plt.subplots(3, 1, figsize=(textwidth, 10), squeeze=False)
     fig.suptitle(
-        f"[{model_type}] Input → {embed_label} → Reconstructed — ID",
+        f"[{model_type}] Representation Pipeline — Input, Latent, and Reconstructed Spaces (ID)",
         fontsize=13,
         fontweight="bold",
     )
@@ -489,13 +624,13 @@ def _plot_embedding_panel(
         coords = project_pca(vecs, ctx.cfg)
         for c in np.unique(labs).astype(int):
             m = labs == c
-            axs[panel].scatter(
+            axs[panel, 0].scatter(
                 coords[m, 0], coords[m, 1], c=[cmap(c)], s=8, alpha=0.5, label=str(c)
             )
-        axs[panel].set_title(title, fontsize=10, fontweight="bold")
-        axs[panel].axis("off")
+        axs[panel, 0].set_title(title, fontsize=10, fontweight="bold")
+        axs[panel, 0].axis("off")
 
-    axs[0].legend(markerscale=2, fontsize=8, ncol=2)
+    axs[0, 0].legend(markerscale=2, fontsize=8, ncol=2)
     plt.tight_layout()
     save_figure(
         fig=fig,
@@ -509,6 +644,7 @@ def _plot_embedding_panel(
             "model_type": str(ctx.cfg.model.model_type),
             "dataset": str(ctx.cfg.data.dataset),
         },
+        png_dpi=int(ctx.cfg.viz.get("savefig_dpi", 300)),
     )
     plt.close(fig)
 

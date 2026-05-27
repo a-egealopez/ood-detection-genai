@@ -4,7 +4,16 @@ import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+from src.artifacts import save_figure
+from src.viz.style import apply_paper_style
+
+# ensure plotting style
+try:
+    apply_paper_style(None)
+except Exception:
+    pass
 
 
 _DDPM_SCORE_MODES = ["noise_single", "noise_multi_mse", "noise_multi_cosine"]
@@ -93,52 +102,70 @@ def run_t_ablation(
     datasets = sorted(abl["dataset"].unique())
 
     # ── Fig 12: AUROC vs T ────────────────────────────────────────────────────
-    fig, axes = plt.subplots(1, len(datasets), figsize=(7 * len(datasets), 5), squeeze=False)
+    textwidth = 6.0
+    fig, axes = plt.subplots(1, len(datasets), figsize=(textwidth * len(datasets), 4), squeeze=False)
     fig.suptitle(
-        "DDPM — AUROC vs n_score_steps (T) en SICAP",
+        "DDPM — AUROC vs. Number of Scoring Steps (T)",
         fontsize=14, fontweight="bold",
     )
 
     for ax, dataset in zip(axes[0], datasets):
-        grouped = (
-            abl[abl["dataset"] == dataset]
-            .groupby(["score", "t_steps"])["auroc"]
-            .mean()
-            .reset_index()
+        subset = abl[abl["dataset"] == dataset]
+        t_vals = sorted(subset["t_steps"].dropna().unique().astype(int))
+        stats = (
+            subset.groupby(["score", "t_steps"])["auroc"].agg(["mean", "std"]).reset_index()
         )
-        t_vals = sorted(abl["t_steps"].dropna().unique().astype(int))
 
-        for mode in _DDPM_SCORE_MODES:
-            mode_data = grouped[grouped["score"] == mode].sort_values("t_steps")
-            if mode_data.empty:
-                continue
-            ax.plot(
-                mode_data["t_steps"],
-                mode_data["auroc"],
-                marker="o",
+        x = np.arange(len(t_vals))
+        bar_width = 0.22
+        offsets = np.linspace(-bar_width, bar_width, len(_DDPM_SCORE_MODES))
+        for offset, mode in zip(offsets, _DDPM_SCORE_MODES):
+            mode_stats = stats[stats["score"] == mode].set_index("t_steps")
+            heights = [
+                float(mode_stats.loc[t, "mean"]) if t in mode_stats.index else np.nan
+                for t in t_vals
+            ]
+            errors = [
+                float(mode_stats.loc[t, "std"]) if t in mode_stats.index else 0.0
+                for t in t_vals
+            ]
+            ax.bar(
+                x + offset,
+                heights,
+                width=bar_width,
+                yerr=errors,
                 label=_MODE_LABELS[mode],
                 color=_MODE_COLORS[mode],
-                lw=2,
-                markersize=7,
+                capsize=3,
+                alpha=0.95,
+                edgecolor="black",
+                linewidth=0.5,
             )
 
         ax.set_title(dataset.upper(), fontsize=12, fontweight="bold")
         ax.set_xlabel("n_score_steps (T)")
         ax.set_ylabel("AUROC")
-        ax.set_xticks(t_vals)
-        aurocs = grouped["auroc"].dropna()
-        if not aurocs.empty:
-            y_min, y_max = float(aurocs.min()), float(aurocs.max())
-            pad = 0.05 * (y_max - y_min) if y_max > y_min else 0.05
-            ax.set_ylim(max(0.0, y_min - pad), min(1.0, y_max + pad))
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(t) for t in t_vals])
+        y_min = float(stats["mean"].min())
+        y_max = float(stats["mean"].max())
+        pad = 0.05 * (y_max - y_min) if y_max > y_min else 0.05
+        ax.set_ylim(max(0.0, y_min - pad), min(1.0, y_max + pad))
         ax.legend(fontsize=9)
-        ax.grid(True, alpha=0.3)
+        ax.grid(True, alpha=0.3, axis="y")
 
     plt.tight_layout()
+    # save figure using save_figure (also exports PDF)
     fig_path = out / "ablation_t_auroc.png"
-    fig.savefig(fig_path, dpi=150, bbox_inches="tight")
+    save_figure(
+        fig,
+        fig_path,
+        run=None,
+        image_key=None,
+        artifact_prefix="ablation",
+    )
     plt.close(fig)
-    print(f"Saved → {fig_path}")
+    print(f"Saved → {fig_path} (and PDF)")
 
     # ── Tab 13: T ablation table ──────────────────────────────────────────────
     grouped_all = (
