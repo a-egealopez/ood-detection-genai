@@ -287,7 +287,7 @@ def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Fi
     return fig
 
 
-def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata) -> plt.Figure:
+def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata, compact: bool = True) -> plt.Figure:
     ctx.model.eval()
     n_samples = int(ctx.cfg.viz.get("recon_n_samples", 2))
     x_id = next(iter(ctx.loaders["id_eval"]))[0][:n_samples].to(ctx.device)
@@ -300,33 +300,51 @@ def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata) 
     model_type = ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
-    fig, axes = plt.subplots(2, n_samples * 2, figsize=(textwidth, 5.5), squeeze=False)
-    fig.suptitle(
-        f"[{model_type}] Reconstruction Quality — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-        fontsize=13,
-        fontweight="bold",
-    )
+    if compact:
+        fig, axes = plt.subplots(2, n_samples * 2, figsize=(textwidth, 3.5), squeeze=False)
+        fig.suptitle(
+            f"[{model_type}] Reconstruction Quality — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+            fontsize=11,
+            fontweight="bold",
+        )
 
-    for col in range(n_samples):
-        axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
-        render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue")
-        axes[1, col].set_ylabel("ID reconstructed", fontsize=9, fontweight="bold", color="steelblue")
-        render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue")
+        for col in range(n_samples):
+            axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
+            render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue")
+            axes[1, col].set_ylabel("ID reconstructed", fontsize=9, fontweight="bold", color="steelblue")
+            render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue")
 
-    for col in range(n_samples, n_samples * 2):
-        idx = col - n_samples
-        axes[0, col].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
-        render_cell(axes[0, col], x_ood[idx].cpu(), is_image, "tomato")
-        axes[1, col].set_ylabel("OOD reconstructed", fontsize=9, fontweight="bold", color="tomato")
-        render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato")
+        for col in range(n_samples, n_samples * 2):
+            idx = col - n_samples
+            axes[0, col].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
+            render_cell(axes[0, col], x_ood[idx].cpu(), is_image, "tomato")
+            axes[1, col].set_ylabel("OOD reconstructed", fontsize=9, fontweight="bold", color="tomato")
+            render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato")
+        
+    else:
+        # FULL
+        fig, axes = plt.subplots(4, n_samples, figsize=(textwidth, 6.5), squeeze=False)
+        fig.suptitle(
+            f"[{model_type}] Reconstruction Quality (Full Layout)\n{metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+            fontsize=12,
+            fontweight="bold",
+        )
 
-    fig.text(
-        0.5,
-        0.01,
-        "Columns = 1..N ID samples followed by 1..N OOD samples.",
-        ha="center",
-        fontsize=9,
-    )
+        for col in range(n_samples):
+            # superior ID
+            axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
+            render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue")
+            
+            axes[1, col].set_ylabel("ID reconstructed", fontsize=9, fontweight="bold", color="steelblue")
+            render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue")
+
+            # inferior OOD
+            axes[2, col].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
+            render_cell(axes[2, col], x_ood[col].cpu(), is_image, "tomato")
+            
+            axes[3, col].set_ylabel("OOD reconstructed", fontsize=9, fontweight="bold", color="tomato")
+            render_cell(axes[3, col], x_recon_ood[col].cpu(), is_image, "tomato")
+
     plt.tight_layout()
     return fig
 
@@ -386,57 +404,65 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
         plt.tight_layout(rect=[0, 0, 0.98, 0.97])
         return fig
 
-    # compact version for memory-friendly figures
-    compact_steps = [1, max(1, max_t // 2), max_t]
+    
+    ### version compacta
+    compact_steps = [
+        int(max_t * 0.05),
+        int(max_t * 0.15),
+        int(max_t * 0.25),
+        int(max_t * 0.50),
+        max_t ]
+    
     x_id = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
     x_ood = next(iter(ctx.loaders["ood_eval"]))[0][:1].to(ctx.device)
     noise_id = ctx.model._fixed_noise(x_id.shape, ctx.device)
     noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
 
-    x_noisy_id = []
-    for t in compact_steps[:-1]:
-        t_tensor = torch.full((1,), t, device=ctx.device, dtype=torch.long)
-        x_noisy_id.append(ctx.model.scheduler.add_noise(x_id, noise_id, t_tensor))
-    x_recon_id, _, _ = ctx.model.reconstruct_at_t(x_id, torch.tensor([compact_steps[-1]], device=ctx.device), noise=noise_id)
 
-    x_noisy_ood = []
-    for t in compact_steps[:-1]:
-        t_tensor = torch.full((1,), t, device=ctx.device, dtype=torch.long)
-        x_noisy_ood.append(ctx.model.scheduler.add_noise(x_ood, noise_ood, t_tensor))
-    x_recon_ood, _, _ = ctx.model.reconstruct_at_t(x_ood, torch.tensor([compact_steps[-1]], device=ctx.device), noise=noise_ood)
+    x_recons_id = []
+    x_recons_ood = []
+    
+    with torch.no_grad():
+        for t in compact_steps:
+            t_tensor = torch.tensor([t], device=ctx.device, dtype=torch.long)
+            # Reconstrucción ID
+            rec_id, _, _ = ctx.model.reconstruct_at_t(x_id, t_tensor, noise=noise_id)
+            x_recons_id.append(rec_id[0].cpu())
+            # Reconstrucción OOD
+            rec_ood, _, _ = ctx.model.reconstruct_at_t(x_ood, t_tensor, noise=noise_ood)
+            x_recons_ood.append(rec_ood[0].cpu())
 
+    # original + reconstrucciones
     n_cols = len(compact_steps) + 1
-    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth, 4.5), squeeze=False)
+    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth, 3.8), squeeze=False)
     fig.suptitle(
-        f"[{model_type}] DDPM Timestep Grid — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-        fontsize=14,
-        fontweight="bold",
-    )
+            f"[{model_type}] Diffusion Process Across Timesteps — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+            fontsize=12,
+            fontweight="bold",
+        )
 
+    # id
     axes[0, 0].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
     render_cell(axes[0, 0], x_id[0].cpu(), is_image, "steelblue")
-    for idx, t in enumerate(compact_steps[:-1], start=1):
-        render_cell(axes[0, idx], x_noisy_id[idx - 1][0].cpu(), is_image, "steelblue")
-        axes[0, idx].set_title(f"x_t (t={t})", fontsize=8)
-    render_cell(axes[0, -1], x_recon_id[0].cpu(), is_image, "steelblue")
-    axes[0, -1].set_title(f"Reconstructed (t={compact_steps[-1]})", fontsize=8)
+    for idx, t in enumerate(compact_steps, start=1):
+        render_cell(axes[0, idx], x_recons_id[idx - 1], is_image, "steelblue")
+        axes[0, idx].set_title(f"Recon. (t={t})", fontsize=8)
 
+    # ood
     axes[1, 0].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
     render_cell(axes[1, 0], x_ood[0].cpu(), is_image, "tomato")
-    for idx, t in enumerate(compact_steps[:-1], start=1):
-        render_cell(axes[1, idx], x_noisy_ood[idx - 1][0].cpu(), is_image, "tomato")
-        axes[1, idx].set_title(f"x_t (t={t})", fontsize=8)
-    render_cell(axes[1, -1], x_recon_ood[0].cpu(), is_image, "tomato")
-    axes[1, -1].set_title(f"Reconstructed (t={compact_steps[-1]})", fontsize=8)
+    for idx, t in enumerate(compact_steps, start=1):
+        render_cell(axes[1, idx], x_recons_ood[idx - 1], is_image, "tomato")
+        axes[1, idx].set_title(f"Recon. (t={t})", fontsize=8)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
 
 
 def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadata) -> plt.Figure:
     ctx.model.eval()
 
-    max_t = int(ctx.model.num_train_timesteps / 2)
+    max_t = int(ctx.model.num_train_timesteps * 0.25) # 1000 * 0.25 = 250
     mode = str(ctx.cfg.viz.get("ddpm_denoising_trajectory_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
@@ -489,10 +515,17 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         return fig
 
-    # compact default: one ID + one OOD row and a few timestep snapshots
     x_id = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
     x_ood = next(iter(ctx.loaders["ood_eval"]))[0][:1].to(ctx.device)
-    capture_timesteps = [max_t, max(1, max_t // 2), 0]
+    
+    capture_timesteps = [
+        max_t,
+        int(max_t * 0.75),
+        int(max_t * 0.50),
+        int(max_t * 0.25),
+        0
+    ]
+    
     noise_id = ctx.model._fixed_noise(x_id.shape, ctx.device)
     noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
 
@@ -509,10 +542,10 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         noise=noise_ood,
     )
 
-    fig, axes = plt.subplots(2, len(capture_timesteps) + 1, figsize=(textwidth, 5.5), squeeze=False)
+    fig, axes = plt.subplots(2, len(capture_timesteps) + 1, figsize=(textwidth, 3.5), squeeze=False)
     fig.suptitle(
         f"[{model_type}] Denoising Trajectory — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-        fontsize=14,
+        fontsize=12,
         fontweight="bold",
     )
 
@@ -520,8 +553,9 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         [(x_id, traj_id, "steelblue", "ID"), (x_ood, traj_ood, "tomato", "OOD")]
     ):
         render_cell(axes[row, 0], x_ref[0].cpu(), is_image, color)
-        axes[row, 0].set_title(f"{tag} original", fontsize=9, color=color)
-        for c, t in enumerate(reversed(capture_timesteps), start=1):
+        axes[row, 0].set_title(f"{tag} orig.", fontsize=9, color=color)
+        
+        for c, t in enumerate(capture_timesteps, start=1):
             token = "x_0 (final)" if t == 0 else f"x_t (t={t})"
             render_cell(axes[row, c], traj[int(t)][0].cpu(), is_image, color)
             axes[row, c].set_title(token, fontsize=8)

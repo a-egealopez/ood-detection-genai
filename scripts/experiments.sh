@@ -127,3 +127,13 @@ exp_all() {
     exp_5
     summary
 }
+
+exp_all_eval() {
+    exp_0     
+    exp_1_eval
+    exp_2_eval
+    exp_3_eval
+    exp_4_eval
+    exp_5     
+    summary   
+}

@@ -56,6 +56,9 @@ Thumbs.db
 results/plots/
 results/summary/
 *.png
+results/**/eval_results.json
+results/**/*.json
+*.json
 
 # ── Override global gitignore  ──────────────────────────────────────────
 *.aux

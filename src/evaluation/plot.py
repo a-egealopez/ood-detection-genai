@@ -61,7 +61,7 @@ def _plot_score_distribution(
             kde = gaussian_kde(s, bw_method=0.3)
             xs = np.linspace(s.min(), s.max(), 300)
             ax.plot(xs, kde(xs), color=c, linewidth=2)
-    ax.set_title(f"Score Distribution — {mode}", fontsize=11, fontweight="bold")
+    ax.set_title(f"Score Distribution", fontsize=11, fontweight="bold")
     ax.set_xlabel("OOD Score (higher = more OOD)")
     ax.set_ylabel("Density")
     ax.legend()
@@ -75,7 +75,7 @@ def _plot_roc_curve(
     fpr, tpr, _ = roc_curve(y, np.concatenate([id_scores, ood_scores]))
     ax.plot(fpr, tpr, color="darkorange", lw=2, label=f"AUROC = {auroc:.4f}")
     ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random")
-    ax.set_title(f"ROC Curve — {mode}", fontsize=11, fontweight="bold")
+    ax.set_title(f"ROC Curve", fontsize=11, fontweight="bold")
     ax.set_xlabel("FPR")
     ax.set_ylabel("TPR")
     ax.legend()
@@ -98,11 +98,7 @@ def plot_ood_evaluation(
     plots_dir: Path | None = None,
     cfg: DictConfig | None = None,
 ) -> None:
-    """Render score distribution and ROC figures.
 
-    Generate one compact figure per scoring mode (distribution + ROC), sized for
-    publication using `cfg.viz.textwidth_in` when available.
-    """
     active_set = {m for m, _, _ in active}
     active_map = {m: (id_a, ood_a) for m, id_a, ood_a in active}
 
