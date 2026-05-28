@@ -10,6 +10,6 @@ set -euo pipefail
 DIR="$(dirname "$0")"
 source "$DIR/core.sh"
 source "$DIR/experiments.sh"
-gpu_select && mkdir -p results/logs results/summary
+gpu_select && mkdir -p results/summary
 for id in "$@"; do "exp_$id"; done
 [[ "${SUMMARIZE:-0}" == "1" ]] && summary

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 from src.artifacts import save_figure
 
@@ -23,6 +24,25 @@ METHOD_ALIASES = {"vae_toy": "vae", "ddpm_toy": "ddpm", "vae_path": "vae", "ddpm
 
 GENERATIVE_METHODS = {"vae", "ddpm"}
 DISTANCE_METHODS = {"knn", "mahalanobis"}
+
+_SCORE_DISPLAY = {
+    "recon":             "MSE Recon.",
+    "elbo":              "ELBO",
+    "latent_knn":        "Latent KNN",
+    "latent_mah":        "Latent Mah.",
+    "noise_single":      "Single-step",
+    "noise_multi_mse":   "Multi-step MSE",
+    "noise_multi_cosine":"Multi-step Cosine",
+    "residual_mah":      "Residual Mah.",
+    "residual_knn":      "Residual KNN",
+}
+
+_METHOD_DISPLAY = {
+    "vae":  "VAE",
+    "ddpm": "DDPM",
+    "knn":  "KNN",
+    "mahalanobis": "Mahalanobis",
+}
 
 
 def _validate(df: pd.DataFrame) -> pd.DataFrame:
@@ -62,11 +82,13 @@ def _parse_t_from_id(experiment_id: str) -> int | None:
 
 
 def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) -> None:
-    n_cols = 8
+    agg = agg[agg["t_steps"] == 10].copy()
+    
+    n_cols = 7
     lines = [
-        r"\begin{tabular}{llrllccc}",
+        r"\begin{tabular}{llllccc}",
         r"\toprule",
-        r"Método & LR & T & Score & N & AUROC & AUPR & FPR@95\% \\",
+        r"Método & LR & Score & N & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
     ]
     for i, dataset in enumerate(sicap_datasets):
@@ -74,16 +96,17 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
             lines.append(r"\midrule")
         lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
         lines.append(r"\midrule")
-        sub = agg[agg["dataset"] == dataset].sort_values(["method", "lr", "score", "t_steps"])
+        sub = agg[agg["dataset"] == dataset].sort_values(["method", "lr", "score"])
+        best_auroc_in_dataset = sub["auroc_mean"].max()
         for _, r in sub.iterrows():
-            t_str = str(int(r["t_steps"])) if pd.notna(r["t_steps"]) else "--"
-            n = int(r["auroc_count"]) if pd.notna(r["auroc_count"]) else 1
+            auroc_str = _tex_meanstd(r["auroc_mean"], r["auroc_std"])
+            if pd.notna(r["auroc_mean"]) and r["auroc_mean"] == best_auroc_in_dataset:
+                auroc_str = rf"\textbf{{{auroc_str}}}"
             cells = [
-                _escape_tex(r["method"]),
+                _escape_tex(_METHOD_DISPLAY.get(r["method"], r["method"])),
                 _fmt(r["lr"], "g"),
-                t_str,
-                _escape_tex(r["score"]),
-                str(n),
+                _escape_tex(_SCORE_DISPLAY.get(r["score"], r["score"])),
+                auroc_str,
                 _tex_meanstd(r["auroc_mean"], r["auroc_std"]),
                 _tex_meanstd(r["aupr_mean"], r["aupr_std"]),
                 _tex_meanstd(r["fpr_at_95_tpr_mean"], r["fpr_at_95_tpr_std"]),
@@ -102,11 +125,12 @@ def _bold_if_best(value: str, metric: float, best: float) -> str:
 def _write_tab11_tex(
     agg: pd.DataFrame, dist: pd.DataFrame, sicap_datasets: list[str], out: Path
 ) -> None:
-    n_cols = 9
+    # Reducimos a 6 columnas esenciales para máxima claridad
+    n_cols = 6
     lines = [
-        r"\begin{tabular}{lllrllccc}",
+        r"\begin{tabular}{lllccc}",
         r"\toprule",
-        r"Método & LR & T & Score & Seed & N & AUROC & AUPR & FPR@95\% \\",
+        r"Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
     ]
     for i, dataset in enumerate(sicap_datasets):
@@ -125,10 +149,7 @@ def _write_tab11_tex(
                 {
                     "method": meth,
                     "lr": "--",
-                    "t": "--",
                     "score": "--",
-                    "seed": _fmt(best["seed"], ".0f"),
-                    "n": "1",
                     "auroc": float(best["auroc"]),
                     "aupr": float(best["aupr"]),
                     "fpr": float(best["fpr_at_95_tpr"]),
@@ -143,10 +164,7 @@ def _write_tab11_tex(
                 {
                     "method": meth,
                     "lr": _fmt(b["lr"], "g"),
-                    "t": str(int(b["t_steps"])) if pd.notna(b["t_steps"]) else "--",
                     "score": _escape_tex(b["score"]),
-                    "seed": _fmt(b["seed"], ".0f"),
-                    "n": str(int(b["auroc_count"])),
                     "auroc": float(b["auroc_mean"]),
                     "aupr": float(b["aupr_mean"]),
                     "fpr": float(b["fpr_at_95_tpr_mean"]),
@@ -155,18 +173,27 @@ def _write_tab11_tex(
 
         best_auroc = max((row["auroc"] for row in rows_to_write), default=float("nan"))
         for row in rows_to_write:
+            # Formateo elegante de los scores compuestos en una sola línea
+            raw_score = _SCORE_DISPLAY.get(row["score"], row["score"])
+            if r"\\" in raw_score:
+                parts = [p.strip() for p in raw_score.split(r"\\")]
+                parts = [p.upper() if len(p) <= 3 else p.capitalize() for p in parts]
+                cleaned_score = f"{parts[0]} ({parts[1]})"
+            else:
+                cleaned_score = raw_score
+
+            score_cell = _escape_tex(cleaned_score)
+
             cells = [
-                _escape_tex(row["method"]),
+                _escape_tex(_METHOD_DISPLAY.get(row["method"], row["method"])),
                 _escape_tex(row["lr"]),
-                _escape_tex(row["t"]),
-                _escape_tex(row["score"]),
-                _escape_tex(row["seed"]),
-                row["n"],
+                score_cell,
                 _bold_if_best(_fmt(row["auroc"], ".4f"), row["auroc"], best_auroc),
                 _fmt(row["aupr"], ".4f"),
                 _fmt(row["fpr"], ".4f"),
             ]
             lines.append(" & ".join(cells) + r" \\")
+            
     lines += [r"\bottomrule", r"\end{tabular}"]
     tex_path = out / "table_comparison_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
@@ -231,7 +258,17 @@ def _plot_sicap_methods(
         )
         ax.set_xticks(x)
         ax.set_xticklabels(labels)
-        ax.set_ylim(0.0, 1.0)
+        ###
+        valid_vals = [v for v in values if not np.isnan(v)]
+        if valid_vals:
+            y_min = max(0.0, min(valid_vals) - 0.05)
+            y_max = min(1.0, max(valid_vals) + 0.03)
+            
+            y_min = min(y_min, 0.6)
+        else:
+            y_min, y_max = 0.0, 1.0
+        ax.set_ylim(y_min, y_max)
+        ###
         ax.set_ylabel("AUROC")
         ax.set_title(dataset.upper(), fontsize=12, fontweight="bold")
         ax.grid(True, alpha=0.2, axis="y")

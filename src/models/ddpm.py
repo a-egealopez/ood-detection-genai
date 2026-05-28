@@ -120,8 +120,8 @@ class DDPMModel(nn.Module, BaseOODModel):
         beta_end: float,
         prediction_type: str,
         n_score_steps: int,
-        recon_timestep: int = 250,
-        noise_timestep: int = 250,
+        recon_timestep: int = 100,
+        noise_timestep: int = 100,
         ood_seed: int = 0,
         dropout: float = 0.0,
     ) -> None:
@@ -351,9 +351,9 @@ class DDPMModel(nn.Module, BaseOODModel):
         return torch.randn(shape, generator=rng, device=device)
 
     def _score_timesteps(self, device: torch.device) -> torch.Tensor:
-        return torch.linspace(
-            1, self.num_train_timesteps - 1, self.n_score_steps, dtype=torch.long, device=device
-        )
+        t_min = max(1, int(self.num_train_timesteps * 0.10))
+        t_max = int(self.num_train_timesteps * 0.60)
+        return torch.linspace(t_min, t_max, self.n_score_steps, dtype=torch.long, device=device)
 
     @torch.no_grad()
     def ood_score(self, x: torch.Tensor, mode: str = "noise_single") -> np.ndarray:
@@ -386,7 +386,8 @@ class DDPMModel(nn.Module, BaseOODModel):
                 z_scores.append(
                     (mse_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
-            return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
+            # INVERTIMOS porque COSINE es medida de SIMILITUD no de DISTANCIA    
+            return -torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if mode == "noise_multi_cosine":
             if self.ood_reference is None or "noise_multi_stats_cosine" not in self.ood_reference:
@@ -402,7 +403,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 z_scores.append(
                     (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
-            # negate so higher score BECAUSE more OOD (z-score of similarity -> distance-like ranking in COSINE DISTANCE).
+            
             return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if self.ood_reference is None or "mahalanobis_mean" not in self.ood_reference:

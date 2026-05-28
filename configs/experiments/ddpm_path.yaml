@@ -11,8 +11,8 @@ model:
   beta_end: 0.02
   prediction_type: epsilon
   n_score_steps: 10
-  recon_timestep: 250
-  noise_timestep: 250
+  recon_timestep: 150
+  noise_timestep: 150
 
 training:
   lr: 1.0e-4

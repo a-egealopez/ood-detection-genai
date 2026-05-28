@@ -49,7 +49,8 @@ def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) 
 
 
 def _plot_score_distribution(
-    id_scores: np.ndarray, ood_scores: np.ndarray, mode: str, auroc: float, ax: plt.Axes
+    id_scores: np.ndarray, ood_scores: np.ndarray, mode: str, auroc: float, ax: plt.Axes,
+    threshold: float | None = None,
 ) -> None:
     bins = np.linspace(
         min(id_scores.min(), ood_scores.min()), max(id_scores.max(), ood_scores.max()), 60
@@ -61,7 +62,10 @@ def _plot_score_distribution(
             kde = gaussian_kde(s, bw_method=0.3)
             xs = np.linspace(s.min(), s.max(), 300)
             ax.plot(xs, kde(xs), color=c, linewidth=2)
-    ax.set_title(f"Score Distribution", fontsize=11, fontweight="bold")
+    if threshold is not None:
+        ax.axvline(threshold, color="black", linestyle="--", linewidth=1.5,
+                   label=f"Threshold = {threshold:.3f}")
+    ax.set_title("Score Distribution", fontsize=11, fontweight="bold")
     ax.set_xlabel("OOD Score (higher = more OOD)")
     ax.set_ylabel("Density")
     ax.legend()
@@ -97,6 +101,7 @@ def plot_ood_evaluation(
     run=None,
     plots_dir: Path | None = None,
     cfg: DictConfig | None = None,
+    thresholds: dict[str, dict] | None = None,
 ) -> None:
 
     active_set = {m for m, _, _ in active}
@@ -117,12 +122,14 @@ def plot_ood_evaluation(
 
         # render one figure per active mode for clarity and publication sizing
         for mode, id_attr, ood_attr in chunk:
+            threshold_val = thresholds[mode]["threshold"] if thresholds and mode in thresholds else None
             fig, axes = plt.subplots(1, 2, figsize=(textwidth, 3.5))
             fig.suptitle(f"OOD Score Evaluation — {mode}", fontsize=14, fontweight="bold")
 
             _plot_score_distribution(
                 getattr(scores, id_attr), getattr(scores, ood_attr),
                 mode, aurocs.get(mode, float("nan")), axes[0],
+                threshold=threshold_val,
             )
             _plot_roc_curve(
                 getattr(scores, id_attr), getattr(scores, ood_attr),

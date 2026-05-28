@@ -146,7 +146,7 @@ def stage_reconstruction_viz_vae(ctx: StageContext) -> None:
     orig_n = ctx.cfg.viz.get("recon_n_samples", 2)
     ctx.cfg.viz["recon_n_samples"] = int(ctx.cfg.viz.get("recon_n_samples_compact", 2))
     _show_save_log(
-        _build_reconstruction_fig_vae(ctx, metadata),
+        _build_reconstruction_fig_vae(ctx, metadata, compact=True),
         ctx,
         "reconstructions_compact.png",
         "eval/reconstructions_compact",
@@ -154,7 +154,7 @@ def stage_reconstruction_viz_vae(ctx: StageContext) -> None:
     # full version (for appendix)
     ctx.cfg.viz["recon_n_samples"] = int(ctx.cfg.viz.get("recon_n_samples_full", 8))
     _show_save_log(
-        _build_reconstruction_fig_vae(ctx, metadata),
+        _build_reconstruction_fig_vae(ctx, metadata, compact=False),
         ctx,
         "reconstructions_full.png",
         "eval/reconstructions_full",
@@ -225,7 +225,7 @@ def stage_evaluation(ctx: StageContext):
     active = _active_modes(scores)
     aurocs = {mode: results.metrics[mode]["auroc"] for mode in results.metrics}
     plots_dir = Path(ctx.cfg.viz.plots_dir)
-    plot_ood_evaluation(scores, aurocs, active, run=ctx.run, plots_dir=plots_dir, cfg=ctx.cfg)
+    plot_ood_evaluation(scores, aurocs, active, run=ctx.run, plots_dir=plots_dir, cfg=ctx.cfg, thresholds=results.thresholds,)
 
     ctx.run.log({"eval/status": "complete"})
     return results
@@ -322,27 +322,26 @@ def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata, 
             render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato")
         
     else:
-        # FULL
-        fig, axes = plt.subplots(4, n_samples, figsize=(textwidth, 6.5), squeeze=False)
+        fig, axes = plt.subplots(4, n_samples, figsize=(textwidth * 2.2, 8.5), squeeze=False)
         fig.suptitle(
             f"[{model_type}] Reconstruction Quality (Full Layout)\n{metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-            fontsize=12,
+            fontsize=14,
             fontweight="bold",
         )
 
         for col in range(n_samples):
-            # superior ID
-            axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
+            # Bloque Superior: ID
+            if col == 0:
+                axes[0, col].set_ylabel("ID original", fontsize=10, fontweight="bold", color="steelblue")
+                axes[1, col].set_ylabel("ID reconstructed", fontsize=10, fontweight="bold", color="steelblue")
             render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue")
-            
-            axes[1, col].set_ylabel("ID reconstructed", fontsize=9, fontweight="bold", color="steelblue")
             render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue")
 
-            # inferior OOD
-            axes[2, col].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
+            # Bloque Inferior: OOD
+            if col == 0:
+                axes[2, col].set_ylabel("OOD original", fontsize=10, fontweight="bold", color="tomato")
+                axes[3, col].set_ylabel("OOD reconstructed", fontsize=10, fontweight="bold", color="tomato")
             render_cell(axes[2, col], x_ood[col].cpu(), is_image, "tomato")
-            
-            axes[3, col].set_ylabel("OOD reconstructed", fontsize=9, fontweight="bold", color="tomato")
             render_cell(axes[3, col], x_recon_ood[col].cpu(), is_image, "tomato")
 
     plt.tight_layout()
@@ -462,7 +461,11 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
 def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadata) -> plt.Figure:
     ctx.model.eval()
 
-    max_t = int(ctx.model.num_train_timesteps * 0.25) # 1000 * 0.25 = 250
+    dataset_config_name = str(ctx.cfg.data.get("dataset", "")).lower()
+    if "pathmnist" in dataset_config_name:
+        max_t = 150 # problemas por falta de embedding
+    else:
+        max_t = int(ctx.model.num_train_timesteps * 0.25) # 1000 * 0.25 = 250
     mode = str(ctx.cfg.viz.get("ddpm_denoising_trajectory_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
     model_type = ctx.cfg.model.model_type.upper()
