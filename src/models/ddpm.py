@@ -346,6 +346,33 @@ class DDPMModel(nn.Module, BaseOODModel):
         cos_sim = (x_vec * xr_vec).sum(dim=1) / (x_vec.norm(dim=1) * xr_vec.norm(dim=1) + 1e-12)
         return 1.0 - cos_sim
 
+    ###
+    def _extract_pred_noise(
+    self, x: torch.Tensor, t: torch.Tensor, noise: torch.Tensor
+    ) -> torch.Tensor:
+        x_noisy = self.scheduler.add_noise(x, noise, t)
+        pred = self.model(x_noisy, t)
+        if self.prediction_type == "epsilon":
+            return pred
+        elif self.prediction_type == "v_prediction":
+            alphas_bar = self.scheduler.alphas_cumprod.to(x.device)
+            ab = alphas_bar[t].view(-1, *([1] * (x.dim() - 1)))
+            return ab.sqrt() * noise + (1 - ab).sqrt() * pred
+        else:
+            alphas_bar = self.scheduler.alphas_cumprod.to(x.device)
+            ab = alphas_bar[t].view(-1, *([1] * (x.dim() - 1)))
+            x_noisy = self.scheduler.add_noise(x, noise, t)
+            return (x_noisy - ab.sqrt() * pred) / (1 - ab).sqrt().clamp(min=1e-8)
+
+    def _noise_pred_error(self, x, t, noise):
+        pred_noise = self._extract_pred_noise(x, t, noise)
+        return self._recon_fn(pred_noise, noise).mean(dim=tuple(range(1, x.dim())))
+
+    def _noise_pred_cosine(self, x, t, noise):
+        pred_noise = self._extract_pred_noise(x, t, noise)
+        return self._cosine_dist(pred_noise, noise)
+    ###
+
     def _fixed_noise(self, shape: tuple, device: torch.device) -> torch.Tensor:
         rng = torch.Generator(device=device).manual_seed(self.ood_seed)
         return torch.randn(shape, generator=rng, device=device)
@@ -368,7 +395,7 @@ class DDPMModel(nn.Module, BaseOODModel):
         if mode == "noise_single":
             t = torch.full((b,), self.noise_timestep, device=x.device, dtype=torch.long)
             x_recon, _, _ = self.reconstruct_at_t(x, t, noise=fixed_noise)
-            return self._mse_score(x_recon, x).cpu().numpy()
+            return self._noise_pred_error(x, t, fixed_noise).cpu().numpy()
 
         score_timesteps = self._score_timesteps(x.device)
 
@@ -382,7 +409,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
                 x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
                 x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
-                mse_score = self._mse_score(x_recon, x)
+                mse_score = self._noise_pred_error(x, t_batch, fixed_noise)
                 z_scores.append(
                     (mse_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
@@ -399,12 +426,12 @@ class DDPMModel(nn.Module, BaseOODModel):
                 t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
                 x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
                 x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
-                cosine_score = self._cosine_dist(x_recon, x)
+                cosine_score = self._noise_pred_cosine(x, t_batch, fixed_noise)
                 z_scores.append(
                     (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
             
-            return -torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
+            return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if self.ood_reference is None or "mahalanobis_mean" not in self.ood_reference:
             raise RuntimeError("OOD reference not built. Call build_ood_reference() first.")
@@ -450,8 +477,10 @@ class DDPMModel(nn.Module, BaseOODModel):
                 t_batch = torch.full((b,), t_key, device=device, dtype=torch.long)
                 x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
                 x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
-                mse_stats_per_t[t_key].extend(self._mse_score(x_recon, x).cpu().tolist())
-                cosine_stats_per_t[t_key].extend(self._cosine_dist(x_recon, x).cpu().tolist())
+                noise_err = self._noise_pred_error(x, t_batch, fixed_noise)
+                cosine_err = self._noise_pred_cosine(x, t_batch, fixed_noise)
+                mse_stats_per_t[t_key].extend(noise_err.fcpu().tolist())
+                cosine_stats_per_t[t_key].extend(cosine_err.cpu().tolist())
 
         residuals_np = np.concatenate(residuals, axis=0)
         ref = build_latent_reference(residuals_np, knn_k=knn_k, normalize_knn=False, reg=1e-5)

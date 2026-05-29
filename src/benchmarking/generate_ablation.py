@@ -111,6 +111,9 @@ def run_t_ablation(
         print("No T-ablation data found (need DDPM SICAP experiments with varying T).")
         return
 
+    # ── CAMBIO CRÍTICO Y GLOBAL ──────────────────────────────────────────────
+    abl.loc[abl["score"] == "noise_single", "t_steps"] = 1
+
     datasets = sorted(abl["dataset"].unique())
 
     # ── Fig 12: AUROC vs T ────────────────────────────────────────────────────
@@ -123,7 +126,9 @@ def run_t_ablation(
 
     for ax, dataset in zip(axes[0], datasets):
         subset = abl[abl["dataset"] == dataset]
+        
         t_vals = sorted(subset["t_steps"].dropna().unique().astype(int))
+        
         stats = (
             subset.groupby(["score", "t_steps"])["auroc"].agg(["mean", "std"]).reset_index()
         )
@@ -131,8 +136,10 @@ def run_t_ablation(
         x = np.arange(len(t_vals))
         bar_width = 0.22
         offsets = np.linspace(-bar_width, bar_width, len(_DDPM_SCORE_MODES))
+        
         for offset, mode in zip(offsets, _DDPM_SCORE_MODES):
             mode_stats = stats[stats["score"] == mode].set_index("t_steps")
+            
             heights = [
                 float(mode_stats.loc[t, "mean"]) if t in mode_stats.index else np.nan
                 for t in t_vals
@@ -141,6 +148,7 @@ def run_t_ablation(
                 float(mode_stats.loc[t, "std"]) if t in mode_stats.index else 0.0
                 for t in t_vals
             ]
+            
             ax.bar(
                 x + offset,
                 heights,
@@ -158,16 +166,17 @@ def run_t_ablation(
         ax.set_xlabel("n_score_steps (T)")
         ax.set_ylabel("AUROC")
         ax.set_xticks(x)
-        ax.set_xticklabels([str(t) for t in t_vals])
-        y_min = float(stats["mean"].min())
-        y_max = float(stats["mean"].max())
+        ax.set_xticklabels([str(t) for t in t_vals]) # El primer tick será "1"
+
+        valid_means = stats["mean"].dropna()
+        y_min = float(valid_means.min()) if not valid_means.empty else 0.0
+        y_max = float(valid_means.max()) if not valid_means.empty else 1.0
         pad = 0.05 * (y_max - y_min) if y_max > y_min else 0.05
         ax.set_ylim(max(0.0, y_min - pad), min(1.0, y_max + pad))
         ax.legend(fontsize=9)
         ax.grid(True, alpha=0.3, axis="y")
 
     plt.tight_layout()
-    # save figure using save_figure (also exports PDF)
     fig_path = out / "ablation_t_auroc.png"
     save_figure(
         fig,

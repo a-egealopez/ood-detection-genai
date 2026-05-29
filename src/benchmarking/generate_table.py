@@ -82,40 +82,54 @@ def _parse_t_from_id(experiment_id: str) -> int | None:
 
 
 def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) -> None:
-    agg = agg[agg["t_steps"] == 10].copy()
+    # Definimos la taxonomía para agrupar
+    groups = {
+        "Baselines": ["knn", "mahalanobis"],
+        "VAE": ["vae"],
+        "DDPM": ["ddpm"]
+    }
     
-    n_cols = 7
+    n_cols = 6
     lines = [
-        r"\begin{longtable}{llllccc}",
+        r"\begin{longtable}{llllll}",
         r"\toprule",
-        r"Método & LR & Score & N & AUROC & AUPR & FPR@95\% \\",
+        r"Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
     ]
-    for i, dataset in enumerate(sicap_datasets):
-        if i > 0:
-            lines.append(r"\midrule")
+    
+    for dataset in sicap_datasets:
         lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
         lines.append(r"\midrule")
-        sub = agg[agg["dataset"] == dataset].sort_values(["method", "lr", "score"])
-        best_auroc_in_dataset = sub["auroc_mean"].max()
-        for _, r in sub.iterrows():
-            auroc_str = _tex_meanstd(r["auroc_mean"], r["auroc_std"])
-            if pd.notna(r["auroc_mean"]) and r["auroc_mean"] == best_auroc_in_dataset:
-                auroc_str = rf"\textbf{{{auroc_str}}}"
-            cells = [
-                _escape_tex(_METHOD_DISPLAY.get(r["method"], r["method"])),
-                _fmt(r["lr"], "g"),
-                _escape_tex(_SCORE_DISPLAY.get(r["score"], r["score"])),
-                auroc_str,
-                _tex_meanstd(r["auroc_mean"], r["auroc_std"]),
-                _tex_meanstd(r["aupr_mean"], r["aupr_std"]),
-                _tex_meanstd(r["fpr_at_95_tpr_mean"], r["fpr_at_95_tpr_std"]),
-            ]
-            lines.append(" & ".join(cells) + r" \\")
+        
+        sub = agg[agg["dataset"] == dataset]
+        
+        for group_name, methods in groups.items():
+            lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textit{{{group_name}}}}} \\")
+            
+            group_data = sub[sub["method"].isin(methods)].sort_values(["method", "lr", "score"])
+            best_auroc = group_data["auroc_mean"].max()
+            
+            for _, r in group_data.iterrows():
+                auroc_val = r["auroc_mean"]
+                auroc_str = _tex_meanstd(auroc_val, r["auroc_std"])
+                if pd.notna(auroc_val) and auroc_val == best_auroc:
+                    auroc_str = rf"\textbf{{{auroc_str}}}"
+                
+                cells = [
+                    _escape_tex(_METHOD_DISPLAY.get(r["method"], r["method"])),
+                    _fmt(r["lr"], "g") if pd.notna(r["lr"]) else "--",
+                    _escape_tex(_SCORE_DISPLAY.get(r["score"], r["score"])),
+                    auroc_str,
+                    _tex_meanstd(r["aupr_mean"], r["aupr_std"]),
+                    _tex_meanstd(r["fpr_at_95_tpr_mean"], r["fpr_at_95_tpr_std"]),
+                ]
+                lines.append(" & ".join(cells) + r" \\")
+            lines.append(r"\addlinespace")
+            
     lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / "table_results_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Saved → {tex_path}")
+    print(f"Tabla guardada en → {tex_path}")
 
 
 def _bold_if_best(value: str, metric: float, best: float) -> str:
@@ -309,9 +323,16 @@ def run_aggregate_tables(
     gen_mask = df["method"].isin(GENERATIVE_METHODS) & df["dataset"].isin(sicap_datasets)
     gen = df[gen_mask].copy()
 
+    dist_df = df[df["method"].isin(DISTANCE_METHODS)].copy()
+    dist_df["t_steps"] = 10  # Valor dummy para el filtro de t_steps=10
+    dist_df["lr"] = np.nan
+    dist_df["score"] = "none"
+    
+    all_data = pd.concat([gen, dist_df], ignore_index=True)
+    
     group_keys = ["dataset", "method", "lr", "t_steps", "score"]
     agg = (
-        gen.groupby(group_keys, dropna=False)[["auroc", "aupr", "fpr_at_95_tpr"]]
+        all_data.groupby(group_keys, dropna=False)[["auroc", "aupr", "fpr_at_95_tpr"]]
         .agg(["mean", "std", "count"])
         .reset_index()
     )

@@ -45,18 +45,21 @@ def run_feature_distance(cfg, device: torch.device, out: str = "") -> Path:
         reg=float(cfg.ood.get("mahalanobis_reg", 1e-5)),
     )
 
+    current_mode = cfg.distance_type
+
     metrics = {}
-    for mode in ("mahalanobis", "knn"):
-        id_scores = _score_features(x_id, ref, mode, device)
-        ood_scores = _score_features(x_ood, ref, mode, device)
-        metrics[mode] = compute_metrics(id_scores, ood_scores)
-        m = metrics[mode]
-        print(
-            f"  [{mode:>12}]  AUROC={m['auroc']:.4f}  AUPR={m['aupr']:.4f}  FPR@95={m['fpr_at_95_tpr']:.4f}"
-        )
+    id_scores = _score_features(x_id, ref, current_mode, device)
+    ood_scores = _score_features(x_ood, ref, current_mode, device)
+    
+    metrics[current_mode] = compute_metrics(id_scores, ood_scores)
+    m = metrics[current_mode]
+    
+    print(
+        f"  [{current_mode:>12}]  AUROC={m['auroc']:.4f}  AUPR={m['aupr']:.4f}  FPR@95={m['fpr_at_95_tpr']:.4f}"
+    )
 
     result = {
-        "method": cfg.distance_type,
+        "method": current_mode,
         "dataset": str(cfg.data.dataset),
         "seed": int(cfg.seed),
         "metrics": metrics,

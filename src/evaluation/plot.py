@@ -124,12 +124,6 @@ def plot_ood_evaluation(
         # render one figure per active mode for clarity and publication sizing
         for mode, id_attr, ood_attr in chunk:
 
-            #############
-            print(f"\n[DEBUG] Evaluando modo: {repr(mode)}")
-            if labels_map:
-                print(f"[DEBUG] ¿Está en labels_map?: {mode in labels_map}")
-                print(f"[DEBUG] Claves disponibles: {list(labels_map.keys())}")
-            ###########
             threshold_val = thresholds[mode]["threshold"] if thresholds and mode in thresholds else None
             fig, axes = plt.subplots(1, 2, figsize=(textwidth, 3.5))
 
