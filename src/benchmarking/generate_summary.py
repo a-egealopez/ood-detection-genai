@@ -3,9 +3,9 @@ import json
 import re
 from pathlib import Path
 
-
 def run_summary(
-    results_dir: str = "results", out_csv: str = "results/summary/comparison.csv"
+    results_dir: str = "results", out_csv: str = "results/summary/comparison.csv",
+    labels_map: dict[str, str] | None = None,
 ) -> Path:
     root = Path(results_dir)
     out = Path(out_csv)
@@ -29,6 +29,7 @@ def run_summary(
         seed = data.get("seed", "")
         lr = data.get("lr", "")
         method = data.get("method", "")
+        t_val = data.get("T", data.get("t", ""))
 
         # Fallback: parse from experiment_id (folder name)
         experiment_id = fp.parent.name
@@ -44,6 +45,10 @@ def run_summary(
             m = re.search(r"_s(\d+)_", experiment_id)
             if m:
                 seed = m.group(1)
+        if not t_val:
+            m = re.search(r"_t(\d+)(?:_|$)", experiment_id)
+            if m:
+                t_val = m.group(1)
         if not method:
             parts = experiment_id.split("_")
             # dist_knn_... → "knn";  vae_... → "vae";  ddpm_toy_... → "ddpm_toy"
@@ -65,6 +70,8 @@ def run_summary(
                 tpr_at_5_fpr_val = thresholds[score].get("tpr")
                 fpr_at_5_fpr_val = thresholds[score].get("fpr")
 
+            pretty_score = labels_map.get(score, score) if labels_map else score
+
             rows.append(
                 {
                     "experiment_id": experiment_id,
@@ -72,7 +79,8 @@ def run_summary(
                     "dataset": dataset,
                     "seed": seed,
                     "lr": lr,
-                    "score": score,
+                    "T": t_val,
+                    "score": pretty_score,
                     "auroc": auroc_val,
                     "aupr": aupr_val,
                     "fpr_at_95_tpr": fpr_at_95_tpr_val,
@@ -92,6 +100,7 @@ def run_summary(
                 "dataset",
                 "seed",
                 "lr",
+                "T",
                 "score",
                 "auroc",
                 "aupr",

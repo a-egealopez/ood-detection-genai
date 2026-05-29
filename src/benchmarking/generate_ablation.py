@@ -38,6 +38,18 @@ def _load_ablation_df(csv_path: Path) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
     for col in ("method", "dataset", "score"):
         df[col] = df[col].astype(str).str.strip().str.lower()
+
+        def _normalize_score(val: str) -> str:
+            if "single" in val or "noise_single" in val:
+                return "noise_single"
+            if "cosine" in val or "noise_multi_cosine" in val:
+                return "noise_multi_cosine"
+            if "mse" in val or "noise_multi_mse" in val:
+                return "noise_multi_mse"
+            return val
+
+        df["score"] = df["score"].apply(_normalize_score)
+
     for col in ("auroc", "aupr", "fpr_at_95_tpr", "seed", "lr"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["t_steps"] = df["experiment_id"].apply(_parse_t)
@@ -58,7 +70,7 @@ def _write_ablation_tex(
     n_cols = 1 + len(t_vals_all)
     col_spec = "l" + "c" * len(t_vals_all)
     lines = [
-        rf"\begin{{tabular}}{{{col_spec}}}",
+        rf"\begin{{longtable}}{{{col_spec}}}",
         r"\toprule",
         "Score Mode & " + " & ".join(f"$T={t}$" for t in t_vals_all) + r" \\",
         r"\midrule",
@@ -76,7 +88,7 @@ def _write_ablation_tex(
                 for t in t_vals_all
             ]
             lines.append(_MODE_LABELS[mode] + " & " + " & ".join(cells) + r" \\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
+    lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / "table_ablation_t.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Saved → {tex_path}")

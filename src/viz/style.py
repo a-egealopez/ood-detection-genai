@@ -6,10 +6,6 @@ from omegaconf import DictConfig
 
 
 def apply_paper_style(cfg: DictConfig | None = None) -> None:
-    """Apply consistent, publication-friendly matplotlib style.
-
-    Reads `cfg.viz.textwidth_in` and `cfg.viz.savefig_dpi` when available.
-    """
     # sensible defaults
     textwidth = 6.0
     savefig_dpi = 300
@@ -35,7 +31,7 @@ def apply_paper_style(cfg: DictConfig | None = None) -> None:
             "grid.alpha": 0.25,
         }
     )
-    # prefer a clean seaborn-like style for paper
+
     try:
         plt.style.use("seaborn-whitegrid")
     except Exception:

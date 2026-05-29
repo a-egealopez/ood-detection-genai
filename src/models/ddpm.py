@@ -387,7 +387,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                     (mse_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
             # INVERTIMOS porque COSINE es medida de SIMILITUD no de DISTANCIA    
-            return -torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
+            return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if mode == "noise_multi_cosine":
             if self.ood_reference is None or "noise_multi_stats_cosine" not in self.ood_reference:
@@ -404,7 +404,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                     (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
             
-            return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
+            return -torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if self.ood_reference is None or "mahalanobis_mean" not in self.ood_reference:
             raise RuntimeError("OOD reference not built. Call build_ood_reference() first.")

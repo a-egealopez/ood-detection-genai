@@ -25,6 +25,21 @@ MODE_LABELS = {
     "stats-summary": "Stats Summary",
 }
 
+SCORE_LABELS: dict[str, str] = {
+    "recon":                "Reconstruction Error",
+    "elbo":                 "ELBO",
+    
+    "latent_knn":           "Latent k-NN",
+    "latent_mah":           "Latent Mahalanobis",
+    
+    "noise_single":         "Single-step MSE",
+    "noise_multi_mse":      "Multi-step MSE (z-score)",
+    "noise_multi_cosine":   "Multi-step Cosine (z-score)",
+    
+    "residual_mah":         "Residual Mahalanobis",
+    "residual_knn":         "Residual k-NN",
+}
+
 
 def _parse_args():
     p = argparse.ArgumentParser(description="Generative model pipeline.")
@@ -67,7 +82,7 @@ def _parse_args():
 
 
 def _mode_stats_summary(args):
-    out_csv = run_summary(results_dir=args.logs_dir, out_csv=args.out_csv)
+    out_csv = run_summary(results_dir=args.logs_dir, out_csv=args.out_csv, labels_map=SCORE_LABELS)
     print(f"saved: {out_csv}")
     out_dir = str(Path(out_csv).parent)
     run_aggregate_tables(csv_path=out_csv, out_dir=out_dir)

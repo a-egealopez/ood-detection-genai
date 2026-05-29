@@ -86,7 +86,7 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
     
     n_cols = 7
     lines = [
-        r"\begin{tabular}{llllccc}",
+        r"\begin{longtable}{llllccc}",
         r"\toprule",
         r"Método & LR & Score & N & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
@@ -112,7 +112,7 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
                 _tex_meanstd(r["fpr_at_95_tpr_mean"], r["fpr_at_95_tpr_std"]),
             ]
             lines.append(" & ".join(cells) + r" \\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
+    lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / "table_results_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Saved → {tex_path}")
@@ -128,7 +128,7 @@ def _write_tab11_tex(
     # Reducimos a 6 columnas esenciales para máxima claridad
     n_cols = 6
     lines = [
-        r"\begin{tabular}{lllccc}",
+        r"\begin{longtable}{lllccc}",
         r"\toprule",
         r"Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
@@ -194,7 +194,7 @@ def _write_tab11_tex(
             ]
             lines.append(" & ".join(cells) + r" \\")
             
-    lines += [r"\bottomrule", r"\end{tabular}"]
+    lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / "table_comparison_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Saved → {tex_path}")
@@ -264,7 +264,7 @@ def _plot_sicap_methods(
             y_min = max(0.0, min(valid_vals) - 0.05)
             y_max = min(1.0, max(valid_vals) + 0.03)
             
-            y_min = min(y_min, 0.6)
+            y_min = min(y_min, 0.75)
         else:
             y_min, y_max = 0.0, 1.0
         ax.set_ylim(y_min, y_max)

@@ -5,6 +5,7 @@
 #   CUDA_VISIBLE_DEVICES=1 nohup bash scripts/run.sh 3 4 5 > /dev/null 2>&1 &    # pathmnist (lento) + sicap + T-ablation
 #   nohup bash scripts/run.sh 0 > /dev/null 2>&1 &                               # baseline en CPU (ligero)
 #   al terminar: SUMMARIZE=1 bash scripts/run.sh                                 # resumen final
+#   para variar: MODEL="vae" o MODEL="ddpm"
 
 set -euo pipefail
 DIR="$(dirname "$0")"

@@ -47,6 +47,22 @@ class DatasetMetadata:
         )
 
 
+MODE_LABELS: dict[str, str] = {
+    "recon":                "Reconstruction Error",
+    "elbo":                 "ELBO",
+    
+    "latent_knn":           "Latent k-NN",
+    "latent_mah":           "Latent Mahalanobis",
+    
+    "noise_single":         "Single-step MSE",
+    "noise_multi_mse":      "Multi-step MSE (z-score)",
+    "noise_multi_cosine":   "Multi-step Cosine (z-score)",
+    
+    "residual_mah":         "Residual Mahalanobis",
+    "residual_knn":         "Residual k-NN",
+}
+
+
 def stage_input_space_viz(ctx: StageContext) -> None:
     metadata = DatasetMetadata.from_cfg(ctx.cfg)
     try:
@@ -225,7 +241,7 @@ def stage_evaluation(ctx: StageContext):
     active = _active_modes(scores)
     aurocs = {mode: results.metrics[mode]["auroc"] for mode in results.metrics}
     plots_dir = Path(ctx.cfg.viz.plots_dir)
-    plot_ood_evaluation(scores, aurocs, active, run=ctx.run, plots_dir=plots_dir, cfg=ctx.cfg, thresholds=results.thresholds,)
+    plot_ood_evaluation(scores, aurocs, active, run=ctx.run, plots_dir=plots_dir, cfg=ctx.cfg, thresholds=results.thresholds,labels_map=MODE_LABELS,)
 
     ctx.run.log({"eval/status": "complete"})
     return results
@@ -233,16 +249,17 @@ def stage_evaluation(ctx: StageContext):
 
 def print_summary(cfg, results) -> None:
     model_type = cfg.model.model_type.upper()
-    print("\n" + "=" * 65)
+    print("\n" + "=" * 75)
     print(f"          {model_type} OOD DETECTION — FINAL SUMMARY")
-    print("=" * 65)
-    print(f"  {'Mode':<12}  {'AUROC':>8}  {'AUPR':>8}  {'FPR@95':>8}")
-    print("  " + "-" * 42)
+    print("=" * 75)
+    print(f"  {'Mode':<26}   {'AUROC':>8}   {'AUPR':>8}   {'FPR@95':>8}")
+    print("  " + "-" * 65)
     for mode, m in results.metrics.items():
-        print(f"  {mode:<12}  {m['auroc']:>8.4f}  {m['aupr']:>8.4f}  {m['fpr_at_95_tpr']:>8.4f}")
-    print("-" * 65)
+        pretty_mode = MODE_LABELS.get(mode, mode)
+        print(f"  {pretty_mode:<26}   {m['auroc']:>8.4f}   {m['aupr']:>8.4f}   {m['fpr_at_95_tpr']:>8.4f}")
+    print("-" * 75)
     print(json.dumps(results.to_dict(), indent=4))
-    print("=" * 65)
+    print("=" * 75)
 
 
 def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Figure:
@@ -688,12 +705,7 @@ def _plot_embedding_panel(
 
 def _build_scores_payload(scores) -> dict:
     payload = {}
-    all_modes = [
-        "recon", "elbo", "latent_knn", "latent_mah",
-        "noise_single", "noise_multi_mse", "noise_multi_cosine",
-        "residual_mah", "residual_knn",
-    ]
-    for mode in all_modes:
+    for mode in MODE_LABELS.keys():
         id_arr = getattr(scores, f"id_{mode}", np.array([]))
         ood_arr = getattr(scores, f"ood_{mode}", np.array([]))
         if id_arr.size > 0:
