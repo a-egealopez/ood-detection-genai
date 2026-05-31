@@ -3,9 +3,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from omegaconf import DictConfig
-
 import wandb
+from omegaconf import DictConfig
 
 
 class _NoOpRun:

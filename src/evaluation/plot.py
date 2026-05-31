@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import umap
+import wandb
 from omegaconf import DictConfig
 from scipy.stats import gaussian_kde
 from sklearn.decomposition import PCA
@@ -15,7 +16,6 @@ from sklearn.metrics import roc_curve
 from sklearn.preprocessing import StandardScaler
 
 import src.viz.style as style
-import wandb
 from src.artifacts import save_figure
 
 if TYPE_CHECKING:
