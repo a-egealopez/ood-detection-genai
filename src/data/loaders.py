@@ -211,7 +211,7 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     try:
         from medmnist import PathMNIST
     except ImportError:
-        raise ImportError("medmnist is required: pip install medmnist")
+        raise ImportError("medmnist is required: pip install medmnist") from None
 
     root = str(cfg.data.get("root", "data/"))
     norm_label = int(cfg.data.get("norm_label", 6))

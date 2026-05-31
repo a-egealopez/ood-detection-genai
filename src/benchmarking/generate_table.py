@@ -258,7 +258,7 @@ def _plot_sicap_methods(
         squeeze=False,
     )
 
-    for ax, dataset in zip(axes[0], sicap_datasets):
+    for ax, dataset in zip(axes[0], sicap_datasets, strict=False):
         values = []
         errors = []
         labels = []

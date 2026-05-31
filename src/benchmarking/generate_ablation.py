@@ -113,7 +113,7 @@ def run_t_ablation(
     )
     fig.suptitle("DDPM — AUROC vs. scoring steps (T)", fontsize=9, fontweight="normal", y=0.97)
 
-    for ax, dataset in zip(axes[0], datasets):
+    for ax, dataset in zip(axes[0], datasets, strict=True):
         subset = abl[abl["dataset"] == dataset]
 
         t_vals = sorted(subset["t_steps"].dropna().unique().astype(int))
@@ -124,7 +124,7 @@ def run_t_ablation(
         bar_width = 0.22
         offsets = np.linspace(-bar_width, bar_width, len(_DDPM_SCORE_MODES))
 
-        for offset, mode in zip(offsets, _DDPM_SCORE_MODES):
+        for offset, mode in zip(offsets, _DDPM_SCORE_MODES, strict=False):
             mode_stats = stats[stats["score"] == mode].set_index("t_steps")
 
             heights = [

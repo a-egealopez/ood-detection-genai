@@ -288,7 +288,7 @@ def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Fi
     id_np, ood_np = to_np(x_id), to_np(x_ood)
     recon_id_np, recon_ood_np = to_np(x_recon_id), to_np(x_recon_ood)
 
-    model_type = ctx.cfg.model.model_type.upper()
+    ctx.cfg.model.model_type.upper()
     fig, axes = plt.subplots(1, 2, figsize=(ctx.cfg.viz.textwidth_in, style.FIG_H1))
     fig.suptitle(
         f"Input vs. reconstructed — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW
@@ -339,7 +339,7 @@ def _build_reconstruction_fig_vae(
         x_recon_ood, _, _ = ctx.model(x_ood)
 
     is_image = bool(ctx.cfg.data.get("is_image", False))
-    model_type = ctx.cfg.model.model_type.upper()
+    ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
     if compact:
@@ -399,7 +399,7 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
     max_t = int(ctx.model.num_train_timesteps) - 1
     mode = str(ctx.cfg.viz.get("ddpm_timestep_grid_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
-    model_type = ctx.cfg.model.model_type.upper()
+    ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
     if mode == "full":
@@ -522,7 +522,7 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         max_t = int(ctx.model.num_train_timesteps * 0.25)  # 1000 * 0.25 = 250
     mode = str(ctx.cfg.viz.get("ddpm_denoising_trajectory_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
-    model_type = ctx.cfg.model.model_type.upper()
+    ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
     if mode == "full":
@@ -689,7 +689,7 @@ def _plot_embedding_panel(
     recon_labs,
     embed_label,
 ) -> None:
-    model_type = ctx.cfg.model.model_type.upper()
+    ctx.cfg.model.model_type.upper()
     cmap = plt.colormaps["tab10"].resampled(10)
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
     fig, axs = plt.subplots(3, 1, figsize=(textwidth, style.FIG_H3), squeeze=False)

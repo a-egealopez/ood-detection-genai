@@ -412,7 +412,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
                 x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
-                x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
+                self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
                 mse_score = self._noise_pred_error(x, t_batch, fixed_noise)
                 z_scores.append(
                     (mse_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
@@ -429,7 +429,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
                 x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
-                x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
+                #x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
                 cosine_score = self._noise_pred_cosine(x, t_batch, fixed_noise)
                 z_scores.append(
                     (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
@@ -477,8 +477,8 @@ class DDPMModel(nn.Module, BaseOODModel):
             for t_step in score_timesteps:
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=device, dtype=torch.long)
-                x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
-                x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
+                self.scheduler.add_noise(x, fixed_noise, t_batch)
+                #x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
                 noise_err = self._noise_pred_error(x, t_batch, fixed_noise)
                 cosine_err = self._noise_pred_cosine(x, t_batch, fixed_noise)
                 mse_stats_per_t[t_key].extend(noise_err.cpu().tolist())
