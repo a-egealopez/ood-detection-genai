@@ -30,6 +30,7 @@ results/training/
 results/evaluation/
 results/summary/
 wandb/
+scripts/copy_results.sh
 
 # Keep placeholder files
 !results/**/.gitkeep

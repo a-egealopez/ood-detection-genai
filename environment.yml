@@ -20,5 +20,5 @@ dependencies:
     - einops>=0.7.0
     - omegaconf>=2.3.0
     - wandb>=0.17.0
-    - ruff>=0.4.4
+    - ruff>=0.15.15
     - pre-commit>=3.7.0

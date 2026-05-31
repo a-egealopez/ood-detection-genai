@@ -1,5 +1,5 @@
 #!/bin/bash
-DEST="copy_results"
+DEST="figures"
 mkdir -p "$DEST"
 
 cat << 'EOF' | while read -r file

@@ -20,9 +20,7 @@ jobs:
         run: pip install ruff==0.15.15
 
       - name: Check linting
-        if: true
         run: ruff check . --config pyproject.toml
 
       - name: Check formatting
-        if: true
         run: ruff format --check . --config pyproject.toml
