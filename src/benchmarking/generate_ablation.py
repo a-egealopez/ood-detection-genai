@@ -124,7 +124,7 @@ def run_t_ablation(
         bar_width = 0.22
         offsets = np.linspace(-bar_width, bar_width, len(_DDPM_SCORE_MODES))
 
-        for offset, mode in zip(offsets, _DDPM_SCORE_MODES, strict=False):
+        for offset, mode in zip(offsets, _DDPM_SCORE_MODES, strict=True):
             mode_stats = stats[stats["score"] == mode].set_index("t_steps")
 
             heights = [

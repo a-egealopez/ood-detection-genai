@@ -21,8 +21,8 @@ jobs:
 
       - name: Check linting
         if: true
-        run: ruff check .
+        run: ruff check . --config pyproject.toml
 
       - name: Check formatting
         if: true
-        run: ruff format --check .
+        run: ruff format --check . --config pyproject.toml
