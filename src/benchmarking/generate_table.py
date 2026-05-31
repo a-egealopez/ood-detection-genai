@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from src.artifacts import save_figure
 
@@ -26,21 +26,21 @@ GENERATIVE_METHODS = {"vae", "ddpm"}
 DISTANCE_METHODS = {"knn", "mahalanobis"}
 
 _SCORE_DISPLAY = {
-    "recon":             "MSE Recon.",
-    "elbo":              "ELBO",
-    "latent_knn":        "Latent KNN",
-    "latent_mah":        "Latent Mah.",
-    "noise_single":      "Single-step",
-    "noise_multi_mse":   "Multi-step MSE",
-    "noise_multi_cosine":"Multi-step Cosine",
-    "residual_mah":      "Residual Mah.",
-    "residual_knn":      "Residual KNN",
+    "recon": "MSE Recon.",
+    "elbo": "ELBO",
+    "latent_knn": "Latent KNN",
+    "latent_mah": "Latent Mah.",
+    "noise_single": "Single-step",
+    "noise_multi_mse": "Multi-step MSE",
+    "noise_multi_cosine": "Multi-step Cosine",
+    "residual_mah": "Residual Mah.",
+    "residual_knn": "Residual KNN",
 }
 
 _METHOD_DISPLAY = {
-    "vae":  "VAE",
+    "vae": "VAE",
     "ddpm": "DDPM",
-    "knn":  "KNN",
+    "knn": "KNN",
     "mahalanobis": "Mahalanobis",
 }
 
@@ -50,7 +50,15 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"comparison.csv is missing columns: {missing}")
     df = df.copy()
-    for col in ("lr", "seed", "auroc", "aupr", "fpr_at_95_tpr", "threshold_at_5_fpr", "tpr_at_5_fpr"):
+    for col in (
+        "lr",
+        "seed",
+        "auroc",
+        "aupr",
+        "fpr_at_95_tpr",
+        "threshold_at_5_fpr",
+        "tpr_at_5_fpr",
+    ):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     for col in ("method", "dataset", "score"):
         df[col] = df[col].astype(str).str.strip().str.lower()
@@ -77,16 +85,14 @@ def _tex_meanstd(mean, std, fmt: str = ".4f", fallback: str = "--") -> str:
 
 def _parse_t_from_id(experiment_id: str) -> int | None:
     import re
+
     m = re.search(r"_t(\d+)(?:_|$)", str(experiment_id))
     return int(m.group(1)) if m else None
 
+
 def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) -> None:
-    groups = {
-        "Baselines": ["knn", "mahalanobis"],
-        "VAE": ["vae"],
-        "DDPM": ["ddpm"]
-    }
-    
+    groups = {"Baselines": ["knn", "mahalanobis"], "VAE": ["vae"], "DDPM": ["ddpm"]}
+
     n_cols = 6
     lines = [
         r"\begin{longtable}{llllll}",
@@ -111,28 +117,30 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
         r"    \bottomrule",
         r"    \endlastfoot",
     ]
-    
+
     for dataset in sicap_datasets:
         lines.append(rf"    \multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
         lines.append(r"    \midrule")
-        
+
         sub = agg[agg["dataset"] == dataset]
-        
+
         for group_name, methods in groups.items():
-            lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\cellcolor{{gray!10}}\textbf{{{group_name}}}}} \\")
-            
+            lines.append(
+                rf"\multicolumn{{{n_cols}}}{{l}}{{\cellcolor{{gray!10}}\textbf{{{group_name}}}}} \\"
+            )
+
             group_data = sub[sub["method"].isin(methods)].sort_values(["method", "lr", "score"])
             best_auroc = group_data["auroc_mean"].max()
-            
+
             for _, r in group_data.iterrows():
                 if group_name == "DDPM" and (pd.isna(r["auroc_std"]) or pd.isna(r["aupr_std"])):
                     continue
-                
+
                 auroc_val = r["auroc_mean"]
                 auroc_str = _tex_meanstd(auroc_val, r["auroc_std"])
                 if pd.notna(auroc_val) and auroc_val == best_auroc:
                     auroc_str = rf"\textbf{{{auroc_str}}}"
-                
+
                 cells = [
                     _escape_tex(_METHOD_DISPLAY.get(r["method"], r["method"])),
                     _fmt(r["lr"], "g") if pd.notna(r["lr"]) else "--",
@@ -143,9 +151,9 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
                 ]
                 lines.append("    " + " & ".join(cells) + r" \\")
             lines.append(r"    \addlinespace")
-            
+
     lines += [r"\end{longtable}"]
-    
+
     tex_path = out / "table_results_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Tabla guardada en → {tex_path}")
@@ -205,7 +213,6 @@ def _write_tab11_tex(
 
         best_auroc = max((row["auroc"] for row in rows_to_write), default=float("nan"))
         for row in rows_to_write:
-            
             raw_score = _SCORE_DISPLAY.get(row["score"], row["score"])
             if r"\\" in raw_score:
                 parts = [p.strip() for p in raw_score.split(r"\\")]
@@ -225,7 +232,7 @@ def _write_tab11_tex(
                 _fmt(row["fpr"], ".4f"),
             ]
             lines.append(" & ".join(cells) + r" \\")
-            
+
     lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / "table_comparison_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
@@ -244,7 +251,12 @@ def _plot_sicap_methods(
     }
 
     textwidth = 5.65
-    fig, axes = plt.subplots(1, len(sicap_datasets), figsize=(textwidth * len(sicap_datasets), textwidth * 0.55), squeeze=False)
+    fig, axes = plt.subplots(
+        1,
+        len(sicap_datasets),
+        figsize=(textwidth * len(sicap_datasets), textwidth * 0.55),
+        squeeze=False,
+    )
 
     for ax, dataset in zip(axes[0], sicap_datasets):
         values = []
@@ -292,7 +304,7 @@ def _plot_sicap_methods(
         if valid_vals:
             y_min = max(0.0, min(valid_vals) - 0.05)
             y_max = min(1.0, max(valid_vals) + 0.03)
-            
+
             y_min = min(y_min, 0.75)
         else:
             y_min, y_max = 0.0, 1.0
@@ -341,12 +353,12 @@ def run_aggregate_tables(
     gen = df[gen_mask].copy()
 
     dist_df = df[df["method"].isin(DISTANCE_METHODS)].copy()
-    dist_df["t_steps"] = 10 
+    dist_df["t_steps"] = 10
     dist_df["lr"] = np.nan
     dist_df["score"] = "--"
-    
+
     all_data = pd.concat([gen, dist_df], ignore_index=True)
-    
+
     group_keys = ["dataset", "method", "lr", "t_steps", "score"]
     agg = (
         all_data.groupby(group_keys, dropna=False)[["auroc", "aupr", "fpr_at_95_tpr"]]

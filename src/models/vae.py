@@ -28,7 +28,6 @@ def _build_decoder(latent_dim: int, hidden_dim: int, output_dim: int, depth: int
 
 
 class VAEModel(nn.Module, BaseOODModel):
-
     def __init__(
         self,
         input_dim: int,
@@ -104,6 +103,7 @@ class VAEModel(nn.Module, BaseOODModel):
     ) -> plt.Figure:
         print(f"\n  Latent snapshot (epoch {epoch}/{epochs})")
         from src.evaluation.extract import extract_representations
+
         zs, labs = extract_representations(self, loaders["id_eval"], device)
         unique = sorted(set(labs.tolist()))
         fig = plot_embeddings(

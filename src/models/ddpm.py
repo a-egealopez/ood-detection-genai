@@ -260,10 +260,13 @@ class DDPMModel(nn.Module, BaseOODModel):
         fig.suptitle(f"DDPM Snapshot (2D) — epoch {epoch}/{epochs}", fontsize=12, fontweight="bold")
         kw = dict(s=10, alpha=0.65)
         axes[0].scatter(orig[:, 0], orig[:, 1], c="steelblue", **kw)
-        axes[0].set_title("Original ID"); axes[0].set_aspect("equal"); axes[0].grid(True, alpha=0.3)
+        axes[0].set_title("Original ID")
+        axes[0].set_aspect("equal")
+        axes[0].grid(True, alpha=0.3)
         axes[1].scatter(recon[:, 0], recon[:, 1], c="darkorange", **kw)
         axes[1].set_title(f"Tweedie recon (t={self.noise_timestep})")
-        axes[1].set_aspect("equal"); axes[1].grid(True, alpha=0.3)
+        axes[1].set_aspect("equal")
+        axes[1].grid(True, alpha=0.3)
         plt.tight_layout()
         self.train()
         return fig
@@ -348,7 +351,7 @@ class DDPMModel(nn.Module, BaseOODModel):
 
     ###
     def _extract_pred_noise(
-    self, x: torch.Tensor, t: torch.Tensor, noise: torch.Tensor
+        self, x: torch.Tensor, t: torch.Tensor, noise: torch.Tensor
     ) -> torch.Tensor:
         x_noisy = self.scheduler.add_noise(x, noise, t)
         pred = self.model(x_noisy, t)
@@ -371,6 +374,7 @@ class DDPMModel(nn.Module, BaseOODModel):
     def _noise_pred_cosine(self, x, t, noise):
         pred_noise = self._extract_pred_noise(x, t, noise)
         return self._cosine_dist(pred_noise, noise)
+
     ###
 
     def _fixed_noise(self, shape: tuple, device: torch.device) -> torch.Tensor:
@@ -413,7 +417,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 z_scores.append(
                     (mse_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
-            # INVERTIMOS porque COSINE es medida de SIMILITUD no de DISTANCIA    
+            # INVERTIMOS porque COSINE es medida de SIMILITUD no de DISTANCIA
             return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if mode == "noise_multi_cosine":
@@ -430,7 +434,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 z_scores.append(
                     (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
-            
+
             return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if self.ood_reference is None or "mahalanobis_mean" not in self.ood_reference:
@@ -465,13 +469,11 @@ class DDPMModel(nn.Module, BaseOODModel):
             b = x.shape[0]
             fixed_noise = self._fixed_noise(x.shape, device)
 
-            
             t_residual = torch.full((b,), self.recon_timestep, device=device, dtype=torch.long)
             x_at_recon_t = self.scheduler.add_noise(x, fixed_noise, t_residual)
             noise_pred_at_t = self.model(x_at_recon_t, t_residual)
             residuals.append((noise_pred_at_t - fixed_noise).reshape(b, -1).cpu().numpy())
 
-    
             for t_step in score_timesteps:
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=device, dtype=torch.long)

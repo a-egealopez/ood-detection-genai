@@ -26,18 +26,15 @@ MODE_LABELS = {
 }
 
 SCORE_LABELS: dict[str, str] = {
-    "recon":                "Reconstruction Error",
-    "elbo":                 "ELBO",
-    
-    "latent_knn":           "Latent k-NN",
-    "latent_mah":           "Latent Mahalanobis",
-    
-    "noise_single":         "Single-step MSE",
-    "noise_multi_mse":      "Multi-step MSE (z-score)",
-    "noise_multi_cosine":   "Multi-step Cosine (z-score)",
-    
-    "residual_mah":         "Residual Mahalanobis",
-    "residual_knn":         "Residual k-NN",
+    "recon": "Reconstruction Error",
+    "elbo": "ELBO",
+    "latent_knn": "Latent k-NN",
+    "latent_mah": "Latent Mahalanobis",
+    "noise_single": "Single-step MSE",
+    "noise_multi_mse": "Multi-step MSE (z-score)",
+    "noise_multi_cosine": "Multi-step Cosine (z-score)",
+    "residual_mah": "Residual Mahalanobis",
+    "residual_knn": "Residual k-NN",
 }
 
 
@@ -49,18 +46,30 @@ def _parse_args():
         choices=["reconstruction-method", "distance-method", "stats-summary"],
         default="reconstruction-method",
     )
-    p.add_argument("--dataset", choices=["mnist", "sicap_c1", "sicap_c12", "moons", "blobs", "pathmnist"], default="mnist")
+    p.add_argument(
+        "--dataset",
+        choices=["mnist", "sicap_c1", "sicap_c12", "moons", "blobs", "pathmnist"],
+        default="mnist",
+    )
     p.add_argument("--seed", type=int)
     p.add_argument("--config", type=str, default="configs/base.yaml")
 
-    p.add_argument("--experiment", choices=["vae", "ddpm", "vae_toy", "ddpm_toy", "vae_path", "ddpm_path"], default="vae")
+    p.add_argument(
+        "--experiment",
+        choices=["vae", "ddpm", "vae_toy", "ddpm_toy", "vae_path", "ddpm_path"],
+        default="vae",
+    )
     p.add_argument("--lr", type=float)
     p.add_argument("--epochs", type=int)
     p.add_argument("--skip-train", action="store_true")
     p.add_argument("--skip-eval", action="store_true")
 
-    p.add_argument("--n-score-steps", type=int, default=None,
-                   help="Override DDPM n_score_steps for noise_multi ablation (eval only, no retrain).")
+    p.add_argument(
+        "--n-score-steps",
+        type=int,
+        default=None,
+        help="Override DDPM n_score_steps for noise_multi ablation (eval only, no retrain).",
+    )
     p.add_argument("--distance-type", choices=["knn", "mahalanobis"], default="knn")
     p.add_argument("--out", default="")
 
@@ -76,15 +85,18 @@ def _parse_args():
     if args.n_score_steps is not None and (
         args.mode != "reconstruction-method" or "ddpm" not in args.experiment
     ):
-        p.error("--n-score-steps is only valid with --mode reconstruction-method and a ddpm experiment")
+        p.error(
+            "--n-score-steps is only valid with --mode reconstruction-method and a ddpm experiment"
+        )
 
     return args
 
 
 def _mode_stats_summary(args):
     from src.viz.style import apply_paper_style
+
     apply_paper_style(None)
-    
+
     out_csv = run_summary(results_dir=args.logs_dir, out_csv=args.out_csv, labels_map=SCORE_LABELS)
     print(f"saved: {out_csv}")
     out_dir = str(Path(out_csv).parent)
@@ -96,6 +108,7 @@ def _mode_distance_method(args):
     cfg = build_config(args.experiment, args.dataset)
 
     from src.viz.style import apply_paper_style
+
     apply_paper_style(cfg)
 
     if args.seed is not None:
@@ -122,6 +135,7 @@ def _mode_reconstruction_method(args):
     cfg.evaluation = cfg.get("evaluation", {})
 
     from src.viz.style import apply_paper_style
+
     apply_paper_style(cfg)
 
     if args.lr is not None:
@@ -136,7 +150,6 @@ def _mode_reconstruction_method(args):
     train_experiment_id = str(cfg.experiment_name)
     cfg.training.checkpoint_dir = f"results/training/{train_experiment_id}/checkpoints"
     cfg.viz.train_plots_dir = f"results/training/{train_experiment_id}/plots"
-
 
     if args.n_score_steps is not None and str(cfg.model.get("model_type", "")) == "ddpm":
         frozen_ckpt_dir = str(cfg.training.checkpoint_dir)

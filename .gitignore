@@ -1,69 +1,61 @@
-# ── Python ────────────────────────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 *.pyo
 *.pyd
+*.egg
+pip-wheel-metadata/
+
+# Environments
 env/
 .venv/
 venv/
 .env
-pip-wheel-metadata/
-*.egg
-
-# ── Conda / entornos locales ─────────────────────────────────────────────
 miniconda3/
 anaconda3/
 *.conda
 
-# ── Datos y modelos grandes (no versionar) ──────────────────────────────
+# Data and model weights (large files, not versioned)
 /data/
-results/checkpoints/
-results/logs/
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.onnx
+*.npz
+
+# Experiment outputs
+results/training/
+results/evaluation/
+results/summary/
 wandb/
 
-# ── Mantener estructura de carpetas vacías ───────────────────────────────
-!data/**/.gitkeep
+# Keep placeholder files
 !results/**/.gitkeep
+!data/**/.gitkeep
 
-# ── Archivos temporales y logs ──────────────────────────────────────────
+# Logs and temp files
 *.log
 *.tmp
 *.bak
 *.swp
-*.DS_Store
+
+# OS
+.DS_Store
 Thumbs.db
 
-# ── IDEs y editores ─────────────────────────────────────────────────────
+# IDEs
 .idea/
 .vscode/
 *.iml
 .ruff_cache/
 
-# ── Notebooks ──────────────────────────────────────────────────────────
+# Jupyter
 .ipynb_checkpoints/
 
-# ── PyTorch / TensorFlow / ML artifacts ─────────────────────────────────
-*.pt
-*.pth
-*.ckpt
-*.h5
-*.tflite
-*.onnx
-*.npz
-
-# ── Otros resultados de experimentos ────────────────────────────────────
-results/plots/
-results/summary/
-*.png
-*.pdf
-results/**/eval_results.json
-results/**/*.json
-*.json
-
-# ── Override global gitignore  ──────────────────────────────────────────
+# LaTeX
 *.aux
-*.log
 *.toc
 *.out
 *.fls

@@ -50,10 +50,10 @@ def run_feature_distance(cfg, device: torch.device, out: str = "") -> Path:
     metrics = {}
     id_scores = _score_features(x_id, ref, current_mode, device)
     ood_scores = _score_features(x_ood, ref, current_mode, device)
-    
+
     metrics[current_mode] = compute_metrics(id_scores, ood_scores)
     m = metrics[current_mode]
-    
+
     print(
         f"  [{current_mode:>12}]  AUROC={m['auroc']:.4f}  AUPR={m['aupr']:.4f}  FPR@95={m['fpr_at_95_tpr']:.4f}"
     )
@@ -70,7 +70,9 @@ def run_feature_distance(cfg, device: torch.device, out: str = "") -> Path:
         out_path = Path(out)
     else:
         experiment_id = build_experiment_id(cfg)
-        eval_dir = Path(str(cfg.get("evaluation", {}).get("results_dir", Path("results") / experiment_id)))
+        eval_dir = Path(
+            str(cfg.get("evaluation", {}).get("results_dir", Path("results") / experiment_id))
+        )
         out_path = eval_dir / "eval_results.json"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

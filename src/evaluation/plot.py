@@ -14,19 +14,21 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import roc_curve
 from sklearn.preprocessing import StandardScaler
 
+import src.viz.style as style
 import wandb
 from src.artifacts import save_figure
-import src.viz.style as style
 
 if TYPE_CHECKING:
     from src.evaluation.extract import ScoreBundle
 
-_SUPTITLE_KW   = dict(fontsize=9, fontweight="normal", y=0.97)
+_SUPTITLE_KW = dict(fontsize=9, fontweight="normal", y=0.97)
 _SUPTITLE_RECT = [0, 0, 1, 0.92]
+
 
 def _apply_suptitle(fig: plt.Figure, title: str, rect_bottom: float = 0.0) -> None:
     fig.suptitle(title, fontsize=8, fontweight="normal", y=0.98)
     fig.tight_layout(rect=[0, rect_bottom, 1, 0.94])
+
 
 def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) -> None:
     arr = tensor.squeeze().cpu().numpy()
@@ -48,7 +50,11 @@ def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) 
 
 
 def _plot_score_distribution(
-    id_scores: np.ndarray, ood_scores: np.ndarray, mode: str, auroc: float, ax: plt.Axes,
+    id_scores: np.ndarray,
+    ood_scores: np.ndarray,
+    mode: str,
+    auroc: float,
+    ax: plt.Axes,
     threshold: float | None = None,
 ) -> None:
     bins = np.linspace(
@@ -62,8 +68,13 @@ def _plot_score_distribution(
             xs = np.linspace(s.min(), s.max(), 300)
             ax.plot(xs, kde(xs), color=c, linewidth=2)
     if threshold is not None:
-        ax.axvline(threshold, color="black", linestyle="--", linewidth=1.5,
-                   label=f"Threshold = {threshold:.3f}")
+        ax.axvline(
+            threshold,
+            color="black",
+            linestyle="--",
+            linewidth=1.5,
+            label=f"Threshold = {threshold:.3f}",
+        )
     ax.set_title("Score Distribution")
     ax.set_xlabel("OOD Score")
     ax.set_ylabel("Density")
@@ -122,21 +133,28 @@ def plot_ood_evaluation(
 
         # render one figure per active mode for clarity and publication sizing
         for mode, id_attr, ood_attr in chunk:
-
-            threshold_val = thresholds[mode]["threshold"] if thresholds and mode in thresholds else None
+            threshold_val = (
+                thresholds[mode]["threshold"] if thresholds and mode in thresholds else None
+            )
             fig, axes = plt.subplots(1, 2, figsize=(textwidth, style.FIG_H1))
 
             pretty_name = labels_map.get(mode, mode) if labels_map else mode
             fig.suptitle(pretty_name, **_SUPTITLE_KW)
 
             _plot_score_distribution(
-                getattr(scores, id_attr), getattr(scores, ood_attr),
-                pretty_name, aurocs.get(mode, float("nan")), axes[0],
+                getattr(scores, id_attr),
+                getattr(scores, ood_attr),
+                pretty_name,
+                aurocs.get(mode, float("nan")),
+                axes[0],
                 threshold=threshold_val,
             )
             _plot_roc_curve(
-                getattr(scores, id_attr), getattr(scores, ood_attr),
-                pretty_name, aurocs.get(mode, float("nan")), axes[1],
+                getattr(scores, id_attr),
+                getattr(scores, ood_attr),
+                pretty_name,
+                aurocs.get(mode, float("nan")),
+                axes[1],
             )
 
             plt.tight_layout(rect=_SUPTITLE_RECT)
@@ -189,6 +207,7 @@ def _project_tsne(zs: np.ndarray, cfg: DictConfig) -> np.ndarray:
 
 def _project_umap(zs: np.ndarray, cfg: DictConfig) -> np.ndarray:
     import warnings
+
     zs_r = _pca_preprocess(_standardize_scale(zs), cfg, components_key="umap_pca_init_components")
     n_neighbors = min(int(cfg.viz.get("umap_n_neighbors", 15)), zs_r.shape[0] - 1)
     with warnings.catch_warnings():

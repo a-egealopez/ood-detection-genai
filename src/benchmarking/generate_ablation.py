@@ -6,19 +6,18 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from src.artifacts import save_figure
-from src.viz.style import apply_paper_style
 
+from src.artifacts import save_figure
 
 _DDPM_SCORE_MODES = ["noise_single", "noise_multi_mse", "noise_multi_cosine"]
 _MODE_COLORS = {
-    "noise_single":      "steelblue",
-    "noise_multi_mse":   "darkorange",
+    "noise_single": "steelblue",
+    "noise_multi_mse": "darkorange",
     "noise_multi_cosine": "mediumseagreen",
 }
 _MODE_LABELS = {
-    "noise_single":      "Single-step MSE",
-    "noise_multi_mse":   "Multi-step MSE (z-score)",
+    "noise_single": "Single-step MSE",
+    "noise_multi_mse": "Multi-step MSE (z-score)",
     "noise_multi_cosine": "Multi-step Cosine (z-score)",
 }
 
@@ -77,10 +76,7 @@ def _write_ablation_tex(
         sub = grouped_all[grouped_all["dataset"] == dataset]
         for mode in _DDPM_SCORE_MODES:
             mode_data = sub[sub["score"] == mode].set_index("T")["AUROC"]
-            cells = [
-                f"{mode_data[t]:.4f}" if t in mode_data.index else "--"
-                for t in t_vals_all
-            ]
+            cells = [f"{mode_data[t]:.4f}" if t in mode_data.index else "--" for t in t_vals_all]
             lines.append(_MODE_LABELS[mode] + " & " + " & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / "table_ablation_t.tex"
@@ -112,34 +108,33 @@ def run_t_ablation(
 
     # ── Fig 12: AUROC vs T ────────────────────────────────────────────────────
     textwidth = 5.65
-    fig, axes = plt.subplots(1, len(datasets), figsize=(textwidth * len(datasets), textwidth * 0.55), squeeze=False)
+    fig, axes = plt.subplots(
+        1, len(datasets), figsize=(textwidth * len(datasets), textwidth * 0.55), squeeze=False
+    )
     fig.suptitle("DDPM — AUROC vs. scoring steps (T)", fontsize=9, fontweight="normal", y=0.97)
 
     for ax, dataset in zip(axes[0], datasets):
         subset = abl[abl["dataset"] == dataset]
-        
+
         t_vals = sorted(subset["t_steps"].dropna().unique().astype(int))
-        
-        stats = (
-            subset.groupby(["score", "t_steps"])["auroc"].agg(["mean", "std"]).reset_index()
-        )
+
+        stats = subset.groupby(["score", "t_steps"])["auroc"].agg(["mean", "std"]).reset_index()
 
         x = np.arange(len(t_vals))
         bar_width = 0.22
         offsets = np.linspace(-bar_width, bar_width, len(_DDPM_SCORE_MODES))
-        
+
         for offset, mode in zip(offsets, _DDPM_SCORE_MODES):
             mode_stats = stats[stats["score"] == mode].set_index("t_steps")
-            
+
             heights = [
                 float(mode_stats.loc[t, "mean"]) if t in mode_stats.index else np.nan
                 for t in t_vals
             ]
             errors = [
-                float(mode_stats.loc[t, "std"]) if t in mode_stats.index else 0.0
-                for t in t_vals
+                float(mode_stats.loc[t, "std"]) if t in mode_stats.index else 0.0 for t in t_vals
             ]
-            
+
             ax.bar(
                 x + offset,
                 heights,
@@ -157,7 +152,7 @@ def run_t_ablation(
         ax.set_xlabel("n_score_steps (T)")
         ax.set_ylabel("AUROC")
         ax.set_xticks(x)
-        ax.set_xticklabels([str(t) for t in t_vals]) # El primer tick será "1"
+        ax.set_xticklabels([str(t) for t in t_vals])  # El primer tick será "1"
 
         valid_means = stats["mean"].dropna()
         y_min = float(valid_means.min()) if not valid_means.empty else 0.0

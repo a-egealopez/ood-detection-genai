@@ -4,10 +4,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig
 
-FIG_W  = 5.65   # = textwidth_in
-FIG_H1 = 3.1    # una fila de subplots  (ratio ~0.55)
-FIG_H2 = 6.2    # dos filas             (ratio ~1.10)
-FIG_H3 = 9.3    # tres filas            (ratio ~1.65)
+FIG_W = 5.65  # = textwidth_in
+FIG_H1 = 3.1  # una fila de subplots  (ratio ~0.55)
+FIG_H2 = 6.2  # dos filas             (ratio ~1.10)
+FIG_H3 = 9.3  # tres filas            (ratio ~1.65)
+
 
 def apply_paper_style(cfg: DictConfig | None = None) -> None:
     # sensible defaults
@@ -22,23 +23,22 @@ def apply_paper_style(cfg: DictConfig | None = None) -> None:
 
     mpl.rcParams.update(
         {
-         "font.size": 9,
-         "axes.titlesize": 9,
-         "axes.labelsize": 9,
-         "axes.titleweight": "normal",
-         "figure.titlesize": 9,
-         "figure.titleweight": "normal",
-         "legend.fontsize": 8,
-         "xtick.labelsize": 8,
-         "ytick.labelsize": 8,
-         "figure.dpi": 150,
-         "savefig.dpi": savefig_dpi,
-         "savefig.bbox": "tight",
-         "axes.grid": True,
-         "grid.alpha": 0.25,
-         "axes.spines.top": False,
-         "axes.spines.right": False,
-         
+            "font.size": 9,
+            "axes.titlesize": 9,
+            "axes.labelsize": 9,
+            "axes.titleweight": "normal",
+            "figure.titlesize": 9,
+            "figure.titleweight": "normal",
+            "legend.fontsize": 8,
+            "xtick.labelsize": 8,
+            "ytick.labelsize": 8,
+            "figure.dpi": 150,
+            "savefig.dpi": savefig_dpi,
+            "savefig.bbox": "tight",
+            "axes.grid": True,
+            "grid.alpha": 0.25,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
         }
     )
 

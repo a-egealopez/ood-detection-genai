@@ -3,8 +3,10 @@ import json
 import re
 from pathlib import Path
 
+
 def run_summary(
-    results_dir: str = "results", out_csv: str = "results/summary/comparison.csv",
+    results_dir: str = "results",
+    out_csv: str = "results/summary/comparison.csv",
     labels_map: dict[str, str] | None = None,
 ) -> Path:
     root = Path(results_dir)
@@ -113,5 +115,7 @@ def run_summary(
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"Saved: {out} ({len(rows)} rows from {len(set(r['experiment_id'] for r in rows))} experiments)")
+    print(
+        f"Saved: {out} ({len(rows)} rows from {len(set(r['experiment_id'] for r in rows))} experiments)"
+    )
     return out

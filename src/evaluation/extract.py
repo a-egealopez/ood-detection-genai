@@ -8,8 +8,6 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from src.models.ood_scorers import DEFAULT_KNN_K
-
 
 @dataclass
 class ScoreBundle:

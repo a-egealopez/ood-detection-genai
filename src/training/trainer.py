@@ -9,7 +9,6 @@ from omegaconf import DictConfig
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from tqdm.auto import tqdm
 
-import wandb
 from src.viz.style import apply_paper_style
 
 
@@ -112,6 +111,7 @@ def _training_snapshot(
     # persist the snapshot to disk and (optionally) W&B instead of showing
     try:
         from pathlib import Path
+
         from src.artifacts import save_figure
 
         plots_dir = Path(cfg.viz.get("train_plots_dir", "results/training/plots/"))
@@ -252,7 +252,9 @@ def train_model(
 
         if scheduler is not None:
             with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message="The epoch parameter in", category=UserWarning)
+                warnings.filterwarnings(
+                    "ignore", message="The epoch parameter in", category=UserWarning
+                )
                 scheduler.step()
 
         if epoch % val_every == 0:
