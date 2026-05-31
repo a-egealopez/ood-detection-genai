@@ -16,18 +16,17 @@ from sklearn.preprocessing import StandardScaler
 
 import wandb
 from src.artifacts import save_figure
-from src.viz.style import apply_paper_style
+import src.viz.style as style
 
 if TYPE_CHECKING:
     from src.evaluation.extract import ScoreBundle
 
+_SUPTITLE_KW   = dict(fontsize=9, fontweight="normal", y=0.97)
+_SUPTITLE_RECT = [0, 0, 1, 0.92]
 
-# apply a consistent plotting style at import time
-try:
-    apply_paper_style(None)
-except Exception:
-    pass
-
+def _apply_suptitle(fig: plt.Figure, title: str, rect_bottom: float = 0.0) -> None:
+    fig.suptitle(title, fontsize=8, fontweight="normal", y=0.98)
+    fig.tight_layout(rect=[0, rect_bottom, 1, 0.94])
 
 def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) -> None:
     arr = tensor.squeeze().cpu().numpy()
@@ -65,8 +64,8 @@ def _plot_score_distribution(
     if threshold is not None:
         ax.axvline(threshold, color="black", linestyle="--", linewidth=1.5,
                    label=f"Threshold = {threshold:.3f}")
-    ax.set_title("Score Distribution", fontsize=11, fontweight="bold")
-    ax.set_xlabel("OOD Score (higher = more OOD)")
+    ax.set_title("Score Distribution")
+    ax.set_xlabel("OOD Score")
     ax.set_ylabel("Density")
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -79,7 +78,7 @@ def _plot_roc_curve(
     fpr, tpr, _ = roc_curve(y, np.concatenate([id_scores, ood_scores]))
     ax.plot(fpr, tpr, color="darkorange", lw=2, label=f"AUROC = {auroc:.4f}")
     ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random")
-    ax.set_title(f"ROC Curve", fontsize=11, fontweight="bold")
+    ax.set_title("ROC Curve")
     ax.set_xlabel("FPR")
     ax.set_ylabel("TPR")
     ax.legend()
@@ -109,7 +108,7 @@ def plot_ood_evaluation(
     active_map = {m: (id_a, ood_a) for m, id_a, ood_a in active}
 
     # determine target width from cfg
-    textwidth = 6.0
+    textwidth = 5.95
     try:
         if cfg is not None:
             textwidth = float(cfg.viz.get("textwidth_in", textwidth))
@@ -125,10 +124,10 @@ def plot_ood_evaluation(
         for mode, id_attr, ood_attr in chunk:
 
             threshold_val = thresholds[mode]["threshold"] if thresholds and mode in thresholds else None
-            fig, axes = plt.subplots(1, 2, figsize=(textwidth, 3.5))
+            fig, axes = plt.subplots(1, 2, figsize=(textwidth, style.FIG_H1))
 
             pretty_name = labels_map.get(mode, mode) if labels_map else mode
-            fig.suptitle(f"OOD Score Evaluation — {pretty_name}", fontsize=14, fontweight="bold")
+            fig.suptitle(pretty_name, **_SUPTITLE_KW)
 
             _plot_score_distribution(
                 getattr(scores, id_attr), getattr(scores, ood_attr),
@@ -140,7 +139,7 @@ def plot_ood_evaluation(
                 pretty_name, aurocs.get(mode, float("nan")), axes[1],
             )
 
-            plt.tight_layout()
+            plt.tight_layout(rect=_SUPTITLE_RECT)
             mode_name = mode
             if plots_dir is not None:
                 save_figure(
@@ -247,7 +246,7 @@ def _scatter_panel(
             marker="x",
             linewidths=0.8,
         )
-    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.set_title(title)
     ax.set_xlabel("Dim 1")
     ax.set_ylabel("Dim 2")
     ax.legend(markerscale=2, fontsize=8, ncol=2)
@@ -266,7 +265,6 @@ def plot_embeddings(
     run=None,
     wandb_key: str | None = None,
 ) -> plt.Figure:
-    """Render one scatter panel per projector for a set of latent embeddings."""
 
     projectors = projectors or list(cfg.viz.get("projectors", DEFAULT_PROJECTORS))
     unknown = [p for p in projectors if p not in PROJECTOR_REGISTRY]
@@ -280,10 +278,10 @@ def plot_embeddings(
     except Exception:
         pass
     width = textwidth * len(projectors)
-    fig, axes = plt.subplots(1, len(projectors), figsize=(width, 3.5))
+    fig, axes = plt.subplots(1, len(projectors), figsize=(width, style.FIG_H1))
     if len(projectors) == 1:
         axes = [axes]
-    fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
+    fig.suptitle(title, **_SUPTITLE_KW)
 
     for ax, name in zip(axes, projectors, strict=False):
         _scatter_panel(
@@ -294,7 +292,7 @@ def plot_embeddings(
             label_map,
             ood_label,
         )
-    plt.tight_layout()
+    plt.tight_layout(rect=_SUPTITLE_RECT)
 
     if save_name:
         save_figure(

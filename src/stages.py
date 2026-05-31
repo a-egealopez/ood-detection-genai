@@ -12,7 +12,7 @@ import src.evaluation as eval
 import src.training as train
 from src.artifacts import save_figure
 from src.evaluation.plot import plot_ood_evaluation, project_pca, render_cell
-from src.viz.style import apply_paper_style
+import src.viz.style as style
 
 
 @dataclass(frozen=True)
@@ -62,11 +62,13 @@ MODE_LABELS: dict[str, str] = {
     "residual_knn":         "Residual k-NN",
 }
 
+_SUPTITLE_KW   = dict(fontsize=9, fontweight="normal", y=0.97)
+_SUPTITLE_RECT = [0, 0, 1, 0.92]
 
 def stage_input_space_viz(ctx: StageContext) -> None:
     metadata = DatasetMetadata.from_cfg(ctx.cfg)
     try:
-        apply_paper_style(ctx.cfg)
+        style.apply_paper_style(ctx.cfg)
     except Exception:
         pass
 
@@ -122,10 +124,10 @@ def stage_training(ctx: StageContext) -> list[dict]:
     fig, axes = plt.subplots(
         n_rows,
         n_cols,
-        figsize=(textwidth, 3.5 * n_rows),
+        figsize=(textwidth, style.FIG_H1 * n_rows),
         squeeze=False,
     )
-    fig.suptitle("Training Loss History", fontsize=14, fontweight="bold")
+    fig.suptitle("Training Loss History", **_SUPTITLE_KW)
 
     axes_flat = list(np.atleast_1d(axes).reshape(-1))
     for ax, key, color in zip(axes_flat, loss_keys, colors, strict=False):
@@ -140,7 +142,7 @@ def stage_training(ctx: StageContext) -> list[dict]:
     for ax in axes_flat[len(loss_keys) :]:
         ax.axis("off")
 
-    plt.tight_layout()
+    plt.tight_layout(rect=_SUPTITLE_RECT)
     _show_save_log(fig, ctx, "training_curves.png", "train/curves")
     ctx.run.log({"train/status": "complete"})
     return history
@@ -222,7 +224,7 @@ def stage_evaluation(ctx: StageContext):
             np.concatenate([embeddings_id, embeddings_ood]),
             np.concatenate([labels_id, np.full(len(embeddings_ood), metadata.ood_label)]),
             ctx.cfg,
-            title=f"Final {embed_label} — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
+            title=f"{embed_label} — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
             label_map=metadata.label_map,
             ood_label=metadata.ood_label,
             run=ctx.run,
@@ -263,7 +265,6 @@ def print_summary(cfg, results) -> None:
 
 
 def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Figure:
-    """2D scatter: original vs reconstructed for ID and OOD toy data."""
     ctx.model.eval()
     with torch.no_grad():
         x_id = torch.cat([x for x, _ in ctx.loaders["id_eval"]], dim=0).to(ctx.device)
@@ -278,16 +279,12 @@ def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Fi
     recon_id_np, recon_ood_np = to_np(x_recon_id), to_np(x_recon_ood)
 
     model_type = ctx.cfg.model.model_type.upper()
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle(
-        f"[{model_type}] Input and Reconstructed Distributions — "
-        f"{metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-        fontsize=13, fontweight="bold",
-    )
+    fig, axes = plt.subplots(1, 2, figsize=(ctx.cfg.viz.textwidth_in, style.FIG_H1))
+    fig.suptitle(f"Input vs. reconstructed — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW)
     kw = dict(s=14, alpha=0.7)
     axes[0].scatter(id_np[:, 0], id_np[:, 1], c="steelblue", label=f"{metadata.id_name} (ID)", **kw)
     axes[0].scatter(ood_np[:, 0], ood_np[:, 1], c="tomato", label=f"{metadata.ood_name} (OOD)", **kw)
-    axes[0].set_title("Input space", fontweight="bold")
+    axes[0].set_title("Input space")
     axes[0].legend(markerscale=2, fontsize=9)
     axes[0].set_aspect("equal"); axes[0].grid(True, alpha=0.3)
 
@@ -295,11 +292,11 @@ def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Fi
                     label=f"Recon {metadata.id_name} (ID)", **kw)
     axes[1].scatter(recon_ood_np[:, 0], recon_ood_np[:, 1], c="darkorange",
                     label=f"Recon {metadata.ood_name} (OOD)", **kw)
-    axes[1].set_title("Reconstructed space", fontweight="bold")
+    axes[1].set_title("Reconstructed space")
     axes[1].legend(markerscale=2, fontsize=9)
     axes[1].set_aspect("equal"); axes[1].grid(True, alpha=0.3)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=_SUPTITLE_RECT)
     ctx.model.train()
     return fig
 
@@ -318,12 +315,8 @@ def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata, 
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
 
     if compact:
-        fig, axes = plt.subplots(2, n_samples * 2, figsize=(textwidth, 3.5), squeeze=False)
-        fig.suptitle(
-            f"[{model_type}] Reconstruction Quality — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-            fontsize=11,
-            fontweight="bold",
-        )
+        fig, axes = plt.subplots(2, n_samples * 2, figsize=(textwidth, style.FIG_H1), squeeze=False)
+            
 
         for col in range(n_samples):
             axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
@@ -339,12 +332,8 @@ def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata, 
             render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato")
         
     else:
-        fig, axes = plt.subplots(4, n_samples, figsize=(textwidth * 2.2, 8.5), squeeze=False)
-        fig.suptitle(
-            f"[{model_type}] Reconstruction Quality (Full Layout)\n{metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-            fontsize=14,
-            fontweight="bold",
-        )
+        fig, axes = plt.subplots(4, n_samples, figsize=(2.0 * n_samples, 2.0 * 4))
+        fig.suptitle(f"Reconstruction — {metadata.id_name} / {metadata.ood_name}", **_SUPTITLE_KW)
 
         for col in range(n_samples):
             # Bloque Superior: ID
@@ -361,7 +350,7 @@ def _build_reconstruction_fig_vae(ctx: StageContext, metadata: DatasetMetadata, 
             render_cell(axes[2, col], x_ood[col].cpu(), is_image, "tomato")
             render_cell(axes[3, col], x_recon_ood[col].cpu(), is_image, "tomato")
 
-    plt.tight_layout()
+    plt.tight_layout(rect=_SUPTITLE_RECT)
     return fig
 
 
@@ -386,12 +375,8 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
             x_recon_ood, x_noisy_ood, _ = ctx.model.reconstruct_at_t(x_ood, t_values, noise=noise_ood)
 
         n_cols = len(keyframes) + 1
-        fig, axes = plt.subplots(6, n_cols, figsize=(2.1 * n_cols, 12))
-        fig.suptitle(
-            f"[{model_type}] Diffusion Process Across Timesteps — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-            fontsize=15,
-            fontweight="bold",
-        )
+        fig, axes = plt.subplots(6, n_cols, figsize=(2.0 * n_cols, 1.8 * 6))
+        fig.suptitle(f"Diffusion timesteps — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW)
 
         for row, (title, batch, color, t_vals) in enumerate(
             [
@@ -417,7 +402,7 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
         fig.text(
             0.99, 0.25, "OOD", fontsize=16, fontweight="bold", color="tomato", va="center", ha="right"
         )
-        plt.tight_layout(rect=[0, 0, 0.98, 0.97])
+        plt.tight_layout(rect=_SUPTITLE_RECT)
         return fig
 
     
@@ -450,12 +435,8 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
 
     # original + reconstrucciones
     n_cols = len(compact_steps) + 1
-    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth, 3.8), squeeze=False)
-    fig.suptitle(
-            f"[{model_type}] Diffusion Process Across Timesteps — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-            fontsize=12,
-            fontweight="bold",
-        )
+    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth, style.FIG_H1), squeeze=False)
+    fig.suptitle(f"Diffusion timesteps — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW)
 
     # id
     axes[0, 0].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
@@ -471,7 +452,7 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
         render_cell(axes[1, idx], x_recons_ood[idx - 1], is_image, "tomato")
         axes[1, idx].set_title(f"Recon. (t={t})", fontsize=8)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.tight_layout(rect=_SUPTITLE_RECT)
     return fig
 
 
@@ -509,12 +490,9 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         )
 
         n_rows = x_ref_id.shape[0] + x_ref_ood.shape[0]
-        fig, axes = plt.subplots(n_rows, n_steps + 1, figsize=(2.0 * (n_steps + 1), 1.9 * n_rows))
-        fig.suptitle(
-            f"[{model_type}] Reverse Denoising Trajectory — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-            fontsize=14,
-            fontweight="bold",
-        )
+        n_cols_full = n_steps + 1
+        fig, axes = plt.subplots(n_rows, n_cols_full, figsize=(2.0 * n_cols_full, 1.8 * n_rows))
+        fig.suptitle(f"Denoising trajectory — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW)
 
         for r in range(n_rows):
             is_ood_row = r >= x_ref_id.shape[0]
@@ -532,7 +510,7 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
                 render_cell(axes[r, c], traj[int(t)][local_r].cpu(), is_image, color)
                 axes[r, c].set_title(f"{tag} {token}", fontsize=8, color=color)
 
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.tight_layout(rect=_SUPTITLE_RECT)
         return fig
 
     x_id = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
@@ -562,12 +540,8 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         noise=noise_ood,
     )
 
-    fig, axes = plt.subplots(2, len(capture_timesteps) + 1, figsize=(textwidth, 3.5), squeeze=False)
-    fig.suptitle(
-        f"[{model_type}] Denoising Trajectory — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
-        fontsize=12,
-        fontweight="bold",
-    )
+    fig, axes = plt.subplots(2, len(capture_timesteps) + 1, figsize=(textwidth, style.FIG_H1), squeeze=False)
+    fig.suptitle(f"Denoising trajectory — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW)
 
     for row, (x_ref, traj, color, tag) in enumerate(
         [(x_id, traj_id, "steelblue", "ID"), (x_ood, traj_ood, "tomato", "OOD")]
@@ -580,7 +554,7 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
             render_cell(axes[row, c], traj[int(t)][0].cpu(), is_image, color)
             axes[row, c].set_title(token, fontsize=8)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.tight_layout(rect=_SUPTITLE_RECT)
     return fig
 
 
@@ -661,12 +635,8 @@ def _plot_embedding_panel(
     model_type = ctx.cfg.model.model_type.upper()
     cmap = plt.colormaps["tab10"].resampled(10)
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
-    fig, axs = plt.subplots(3, 1, figsize=(textwidth, 10), squeeze=False)
-    fig.suptitle(
-        f"[{model_type}] Representation Pipeline — Input, Latent, and Reconstructed Spaces (ID)",
-        fontsize=13,
-        fontweight="bold",
-    )
+    fig, axs = plt.subplots(3, 1, figsize=(textwidth, style.FIG_H3), squeeze=False)
+    fig.suptitle("Input · Latent · Reconstructed (ID)", **_SUPTITLE_KW)
 
     for panel, (vecs, labs, title) in enumerate(
         [
@@ -685,7 +655,7 @@ def _plot_embedding_panel(
         axs[panel, 0].axis("off")
 
     axs[0, 0].legend(markerscale=2, fontsize=8, ncol=2)
-    plt.tight_layout()
+    plt.tight_layout(rect=_SUPTITLE_RECT)
     save_figure(
         fig=fig,
         out_path=Path(ctx.cfg.viz.plots_dir) / "embedding_panel.png",

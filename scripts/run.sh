@@ -6,6 +6,7 @@
 #   nohup bash scripts/run.sh 0 > /dev/null 2>&1 &                               # baseline en CPU (ligero)
 #   al terminar: SUMMARIZE=1 bash scripts/run.sh                                 # resumen final
 #   para variar: MODEL="vae" o MODEL="ddpm"
+#   para evaluar en multiterminal: nohup bash scripts/run.sh 1_eval > /dev/null 2>&1 & nohup bash scripts/run.sh 2_eval > /dev/null 2>&1 & nohup bash scripts/run.sh 3_eval > /dev/null 2>&1 & nohup bash scripts/run.sh 4_eval > /dev/null 2>&1 & nohup bash scripts/run.sh 5 > /dev/null 2>&1 &
 
 set -euo pipefail
 DIR="$(dirname "$0")"

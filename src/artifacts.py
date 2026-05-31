@@ -74,11 +74,9 @@ def save_figure(
     save_vector_formats: list[str] | None = None,
     png_dpi: int = 300,
 ) -> Path:
-    """Save figure locally and optionally log image + artifact to W&B."""
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    # normalize target paths: ensure a PNG is always created, and optionally
-    # create vector formats (PDF) for publication-quality export.
+
     if save_vector_formats is None:
         save_vector_formats = ["pdf"]
 
@@ -95,12 +93,11 @@ def save_figure(
             out_vec = out.with_suffix(f".{fmt}")
             fig.savefig(out_vec, bbox_inches="tight")
         except Exception:
-            # non-fatal: continue if a format can't be written
             pass
     if run is not None:
         if image_key:
             run.log({image_key: wandb.Image(fig)})
-        # log the PNG as the canonical artifact
+
         _log_artifact(
             run, _slug(f"{artifact_prefix}-{out_png.stem}"), artifact_type, out_png, metadata or {}
         )

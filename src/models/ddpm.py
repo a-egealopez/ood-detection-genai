@@ -479,7 +479,7 @@ class DDPMModel(nn.Module, BaseOODModel):
                 x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
                 noise_err = self._noise_pred_error(x, t_batch, fixed_noise)
                 cosine_err = self._noise_pred_cosine(x, t_batch, fixed_noise)
-                mse_stats_per_t[t_key].extend(noise_err.fcpu().tolist())
+                mse_stats_per_t[t_key].extend(noise_err.cpu().tolist())
                 cosine_stats_per_t[t_key].extend(cosine_err.cpu().tolist())
 
         residuals_np = np.concatenate(residuals, axis=0)

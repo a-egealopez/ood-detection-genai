@@ -1,0 +1,57 @@
+#!/bin/bash
+DEST="copy_results"
+mkdir -p "$DEST"
+
+cat << 'EOF' | while read -r file
+results-evaluation-vae_sicap_c12_s42_lr0.0005-plots-ood_scores_elbo.pdf
+results-evaluation-vae_sicap_c12_s42_lr0.0005-plots-ood_scores_latent_knn.pdf
+results-evaluation-vae_sicap_c12_s42_lr0.0005-plots-ood_scores_latent_mah.pdf
+results-evaluation-ddpm_sicap_c12_s42_lr0.001_t10-plots-ood_scores_noise_multi_cosine.pdf
+results-evaluation-ddpm_sicap_c12_s42_lr0.001_t10-plots-ood_scores_noise_multi_mse.pdf
+results-evaluation-ddpm_sicap_c12_s42_lr0.001_t10-plots-ood_scores_noise_single.pdf
+results-evaluation-vae_sicap_c12_s42_lr0.0005-plots-ood_scores_recon.pdf
+results-evaluation-ddpm_sicap_c12_s42_lr0.001_t10-plots-ood_scores_residual_knn.pdf
+results-evaluation-ddpm_sicap_c12_s42_lr0.001_t10-plots-ood_scores_residual_mah.pdf
+results-evaluation-vae_sicap_c1_s42_lr0.0001-plots-ood_scores_elbo.pdf
+results-evaluation-vae_sicap_c1_s42_lr0.0001-plots-ood_scores_latent_knn.pdf
+results-evaluation-vae_sicap_c1_s42_lr0.0001-plots-ood_scores_latent_mah.pdf
+results-evaluation-ddpm_sicap_c1_s42_lr0.0001_t10-plots-ood_scores_noise_multi_cosine.pdf
+results-evaluation-ddpm_sicap_c1_s42_lr0.0001_t10-plots-ood_scores_noise_multi_mse.pdf
+results-evaluation-ddpm_sicap_c1_s42_lr0.0001_t10-plots-ood_scores_noise_single.pdf
+results-evaluation-vae_sicap_c1_s42_lr0.0001-plots-ood_scores_recon.pdf
+results-evaluation-ddpm_sicap_c1_s42_lr0.0001_t10-plots-ood_scores_residual_knn.pdf
+results-evaluation-ddpm_sicap_c1_s42_lr0.0001_t10-plots-ood_scores_residual_mah.pdf
+results-evaluation-ddpm_mnist_s42_lr0.0001_t10-plots-ddpm_denoising_trajectory_compact.pdf
+results-evaluation-ddpm_mnist_s42_lr0.0001_t10-plots-ddpm_timestep_grid_compact.pdf
+results-evaluation-ddpm_pathmnist_s42_lr0.0001_t10-plots-ddpm_denoising_trajectory_compact.pdf
+results-evaluation-ddpm_pathmnist_s42_lr0.0001_t10-plots-ddpm_timestep_grid_compact.pdf
+results-evaluation-ddpm_blobs_s42_lr0.001_t10-plots-reconstructions.pdf
+results-evaluation-ddpm_moons_s42_lr0.001_t10-plots-reconstructions.pdf
+results-evaluation-vae_mnist_s42_lr0.0001-plots-embedding_vs_ood.pdf
+results-training-vae_mnist_s42_lr0.0001-plots-input_space_vs_ood.pdf
+results-evaluation-vae_mnist_s42_lr0.0001-plots-reconstructions_compact.pdf
+results-evaluation-vae_pathmnist_s42_lr0.0001-plots-embedding_vs_ood.pdf
+results-training-vae_pathmnist_s42_lr0.0001-plots-input_space_vs_ood.pdf
+results-evaluation-vae_pathmnist_s42_lr0.0001-plots-reconstructions_compact.pdf
+results-training-vae_sicap_c12_s42_lr0.0001-plots-input_space_vs_ood.pdf
+results-training-vae_blobs_s42_lr0.001-plots-input_space_vs_ood.pdf
+results-evaluation-vae_blobs_s42_lr0.001-plots-reconstructions.pdf
+results-training-vae_moons_s42_lr0.001-plots-input_space_vs_ood.pdf
+results-evaluation-vae_moons_s42_lr0.001-plots-reconstructions.pdf
+results-summary-ablation_t_auroc.pdf
+results-summary-sicap_methods_comparison.pdf
+results-training-ddpm_sicap_c12_s42_lr0.0001_t10-plots-training_curves.pdf
+results-training-ddpm_sicap_c1_s42_lr0.0001_t10-plots-training_curves.pdf
+results-training-vae_sicap_c12_s42_lr0.0001-plots-training_curves.png
+results-training-vae_sicap_c1_s42_lr0.0001-plots-training_curves.pdf
+results-evaluation-vae_mnist_s42_lr0.0001-plots-reconstructions_full.pdf
+results-evaluation-vae_pathmnist_s42_lr0.0001-plots-reconstructions_full.pdf
+results-evaluation-ddpm_mnist_s42_lr0.0001_t10-plots-ddpm_timestep_grid_full.pdf
+results-evaluation-ddpm_mnist_s42_lr0.0001_t10-plots-ddpm_denoising_trajectory_full.pdf
+results-evaluation-ddpm_pathmnist_s42_lr0.0001_t10-plots-ddpm_timestep_grid_full.pdf
+results-evaluation-ddpm_pathmnist_s42_lr0.0001_t10-plots-ddpm_denoising_trajectory_full.pdf
+EOF
+do
+    src="${file//-/\/}"
+    [ -f "$src" ] && cp "$src" "$DEST/$file" || echo "Not found: $src"
+done

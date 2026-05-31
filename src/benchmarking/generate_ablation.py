@@ -9,12 +9,6 @@ import pandas as pd
 from src.artifacts import save_figure
 from src.viz.style import apply_paper_style
 
-# ensure plotting style
-try:
-    apply_paper_style(None)
-except Exception:
-    pass
-
 
 _DDPM_SCORE_MODES = ["noise_single", "noise_multi_mse", "noise_multi_cosine"]
 _MODE_COLORS = {
@@ -117,12 +111,9 @@ def run_t_ablation(
     datasets = sorted(abl["dataset"].unique())
 
     # ── Fig 12: AUROC vs T ────────────────────────────────────────────────────
-    textwidth = 6.0
-    fig, axes = plt.subplots(1, len(datasets), figsize=(textwidth * len(datasets), 4), squeeze=False)
-    fig.suptitle(
-        "DDPM — AUROC vs. Number of Scoring Steps (T)",
-        fontsize=14, fontweight="bold",
-    )
+    textwidth = 5.65
+    fig, axes = plt.subplots(1, len(datasets), figsize=(textwidth * len(datasets), textwidth * 0.55), squeeze=False)
+    fig.suptitle("DDPM — AUROC vs. scoring steps (T)", fontsize=9, fontweight="normal", y=0.97)
 
     for ax, dataset in zip(axes[0], datasets):
         subset = abl[abl["dataset"] == dataset]
@@ -176,7 +167,7 @@ def run_t_ablation(
         ax.legend(fontsize=9)
         ax.grid(True, alpha=0.3, axis="y")
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     fig_path = out / "ablation_t_auroc.png"
     save_figure(
         fig,
@@ -184,6 +175,7 @@ def run_t_ablation(
         run=None,
         image_key=None,
         artifact_prefix="ablation",
+        png_dpi=300,
     )
     plt.close(fig)
     print(f"Saved → {fig_path} (and PDF)")

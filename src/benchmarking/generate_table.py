@@ -80,9 +80,7 @@ def _parse_t_from_id(experiment_id: str) -> int | None:
     m = re.search(r"_t(\d+)(?:_|$)", str(experiment_id))
     return int(m.group(1)) if m else None
 
-
 def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) -> None:
-    # Definimos la taxonomía para agrupar
     groups = {
         "Baselines": ["knn", "mahalanobis"],
         "VAE": ["vae"],
@@ -92,24 +90,44 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
     n_cols = 6
     lines = [
         r"\begin{longtable}{llllll}",
-        r"\toprule",
-        r"Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
-        r"\midrule",
+        # Título y etiqueta principales (primera página)
+        r"    \toprule",
+        r"    Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
+        r"    \midrule",
+        r"    \endhead",
+        r"    ",
+        # Título y encabezado para las páginas siguientes (2, 3, etc.)
+        r"    \toprule",
+        r"    Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
+        r"    \midrule",
+        r"    \endlisthead",
+        r"    ",
+        # Pie de tabla para páginas intermedias
+        r"    \midrule",
+        r"    \multicolumn{6}{r}{\textit{Continúa en la página siguiente}} \\",
+        r"    \endfoot",
+        r"    ",
+        # Pie de tabla para la última página
+        r"    \bottomrule",
+        r"    \endlastfoot",
     ]
     
     for dataset in sicap_datasets:
-        lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
-        lines.append(r"\midrule")
+        lines.append(rf"    \multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
+        lines.append(r"    \midrule")
         
         sub = agg[agg["dataset"] == dataset]
         
         for group_name, methods in groups.items():
-            lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textit{{{group_name}}}}} \\")
+            lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\cellcolor{{gray!10}}\textbf{{{group_name}}}}} \\")
             
             group_data = sub[sub["method"].isin(methods)].sort_values(["method", "lr", "score"])
             best_auroc = group_data["auroc_mean"].max()
             
             for _, r in group_data.iterrows():
+                if group_name == "DDPM" and (pd.isna(r["auroc_std"]) or pd.isna(r["aupr_std"])):
+                    continue
+                
                 auroc_val = r["auroc_mean"]
                 auroc_str = _tex_meanstd(auroc_val, r["auroc_std"])
                 if pd.notna(auroc_val) and auroc_val == best_auroc:
@@ -123,10 +141,11 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
                     _tex_meanstd(r["aupr_mean"], r["aupr_std"]),
                     _tex_meanstd(r["fpr_at_95_tpr_mean"], r["fpr_at_95_tpr_std"]),
                 ]
-                lines.append(" & ".join(cells) + r" \\")
-            lines.append(r"\addlinespace")
+                lines.append("    " + " & ".join(cells) + r" \\")
+            lines.append(r"    \addlinespace")
             
-    lines += [r"\bottomrule", r"\end{longtable}"]
+    lines += [r"\end{longtable}"]
+    
     tex_path = out / "table_results_sicap.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Tabla guardada en → {tex_path}")
@@ -139,7 +158,6 @@ def _bold_if_best(value: str, metric: float, best: float) -> str:
 def _write_tab11_tex(
     agg: pd.DataFrame, dist: pd.DataFrame, sicap_datasets: list[str], out: Path
 ) -> None:
-    # Reducimos a 6 columnas esenciales para máxima claridad
     n_cols = 6
     lines = [
         r"\begin{longtable}{lllccc}",
@@ -187,7 +205,7 @@ def _write_tab11_tex(
 
         best_auroc = max((row["auroc"] for row in rows_to_write), default=float("nan"))
         for row in rows_to_write:
-            # Formateo elegante de los scores compuestos en una sola línea
+            
             raw_score = _SCORE_DISPLAY.get(row["score"], row["score"])
             if r"\\" in raw_score:
                 parts = [p.strip() for p in raw_score.split(r"\\")]
@@ -225,12 +243,9 @@ def _plot_sicap_methods(
         "ddpm": "darkorange",
     }
 
-    fig, axes = plt.subplots(
-        1,
-        len(sicap_datasets),
-        figsize=(6 * len(sicap_datasets), 4),
-        squeeze=False,
-    )
+    textwidth = 5.65
+    fig, axes = plt.subplots(1, len(sicap_datasets), figsize=(textwidth * len(sicap_datasets), textwidth * 0.55), squeeze=False)
+
     for ax, dataset in zip(axes[0], sicap_datasets):
         values = []
         errors = []
@@ -287,13 +302,15 @@ def _plot_sicap_methods(
         ax.set_title(dataset.upper(), fontsize=12, fontweight="bold")
         ax.grid(True, alpha=0.2, axis="y")
 
-    plt.tight_layout()
+    fig.suptitle("AUROC por método", fontsize=9, fontweight="normal", y=0.97)
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     save_figure(
         fig,
         out / "sicap_methods_comparison.png",
         run=None,
         image_key=None,
         artifact_prefix="sicap-methods-comparison",
+        png_dpi=300,
     )
     plt.close(fig)
 
@@ -324,9 +341,9 @@ def run_aggregate_tables(
     gen = df[gen_mask].copy()
 
     dist_df = df[df["method"].isin(DISTANCE_METHODS)].copy()
-    dist_df["t_steps"] = 10  # Valor dummy para el filtro de t_steps=10
+    dist_df["t_steps"] = 10 
     dist_df["lr"] = np.nan
-    dist_df["score"] = "none"
+    dist_df["score"] = "--"
     
     all_data = pd.concat([gen, dist_df], ignore_index=True)
     

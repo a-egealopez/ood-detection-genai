@@ -82,6 +82,9 @@ def _parse_args():
 
 
 def _mode_stats_summary(args):
+    from src.viz.style import apply_paper_style
+    apply_paper_style(None)
+    
     out_csv = run_summary(results_dir=args.logs_dir, out_csv=args.out_csv, labels_map=SCORE_LABELS)
     print(f"saved: {out_csv}")
     out_dir = str(Path(out_csv).parent)
@@ -91,6 +94,9 @@ def _mode_stats_summary(args):
 
 def _mode_distance_method(args):
     cfg = build_config(args.experiment, args.dataset)
+
+    from src.viz.style import apply_paper_style
+    apply_paper_style(cfg)
 
     if args.seed is not None:
         cfg.seed = args.seed
@@ -114,6 +120,9 @@ def _mode_distance_method(args):
 def _mode_reconstruction_method(args):
     cfg = build_config(args.experiment, args.dataset)
     cfg.evaluation = cfg.get("evaluation", {})
+
+    from src.viz.style import apply_paper_style
+    apply_paper_style(cfg)
 
     if args.lr is not None:
         cfg.training.lr = args.lr
