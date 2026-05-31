@@ -8,6 +8,10 @@
 
 Framework for **out-of-distribution (OOD) detection** using generative models. Compares reconstruction-based methods (VAE, DDPM) with distance-based baselines (KNN, Mahalanobis) across multiple datasets and scoring strategies.
 
+OOD detection asks whether a test sample comes from the same distribution the model was trained on. Here, generative models are trained exclusively on in-distribution data and used at inference time to score samples — without any OOD examples during training. The primary application is histopathology: detecting high-grade prostate cancer (Gleason 3–4) as OOD with respect to a model trained on benign tissue (Gleason 1–2).
+
+![DDPM denoising trajectory on MNIST](figures/results-evaluation-ddpm_mnist_s42_lr0.0001_t10-plots-ddpm_denoising_trajectory_compact.png)
+
 Developed as a Bachelor's thesis — Universidad de Granada, 2026.
 
 ---
@@ -122,14 +126,14 @@ bash scripts/run.sh 0
 SUMMARIZE=1 bash scripts/run.sh
 ```
 
-| Group | Content |
-|-------|---------|
-| `exp_0` | KNN + Mahalanobis baselines on SICAP |
-| `exp_1` | VAE + DDPM on toy datasets (moons, blobs) |
-| `exp_2` | VAE + DDPM on MNIST |
-| `exp_3` | VAE + DDPM on PathMNIST |
-| `exp_4` | VAE + DDPM on SICAP (multi-seed, multi-LR) |
-| `exp_5` | DDPM scoring-step ablation (T ∈ {5, 10, 25, 50}) |
+| Group | Content | Purpose |
+|-------|---------|---------|
+| `exp_0` | KNN + Mahalanobis baselines on SICAP | Distance-based reference, no training required |
+| `exp_1` | VAE + DDPM on toy datasets (moons, blobs) | Sanity check on controlled 2D data |
+| `exp_2` | VAE + DDPM on MNIST | Benchmark on standard image data (MNIST vs SVHN) |
+| `exp_3` | VAE + DDPM on PathMNIST | Benchmark on histopathology images (normal vs tumour) |
+| `exp_4` | VAE + DDPM on SICAP (multi-seed, multi-LR) | Main evaluation, results averaged across seeds |
+| `exp_5` | DDPM scoring-step ablation (T ∈ {5, 10, 25, 50}) | Sensitivity of noise-based scores to number of steps |
 
 Override defaults with environment variables:
 
@@ -186,6 +190,12 @@ W&B logging is enabled by default. To disable:
 wandb:
   enabled: false
 ```
+---
+
+## Notes
+
+This repository reflects the academic release of the thesis codebase.
+It does not include a test suite.
 
 ---
 
