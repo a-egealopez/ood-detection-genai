@@ -33,6 +33,8 @@ _SCORE_DISPLAY = {
     "noise_single": "Single-step",
     "noise_multi_mse": "Multi-step MSE",
     "noise_multi_cosine": "Multi-step Cosine",
+    "recon_single": "Single-step Reconstruction",
+    "recon_multi": "Multi-step Reconstruction",
     "residual_mah": "Residual Mah.",
     "residual_knn": "Residual KNN",
 }
@@ -42,6 +44,12 @@ _METHOD_DISPLAY = {
     "ddpm": "DDPM",
     "knn": "KNN",
     "mahalanobis": "Mahalanobis",
+}
+
+# Groups of datasets treated together (one figure + table per group)
+_DATASET_GROUPS = {
+    "sicap": ["sicap_c1", "sicap_c12"],
+    "pathmnist": ["pathmnist_c1", "pathmnist_c2"],
 }
 
 
@@ -90,35 +98,31 @@ def _parse_t_from_id(experiment_id: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) -> None:
+def _write_tab_results_tex(agg: pd.DataFrame, datasets: list[str], out: Path, suffix: str) -> None:
     groups = {"Baselines": ["knn", "mahalanobis"], "VAE": ["vae"], "DDPM": ["ddpm"]}
 
     n_cols = 6
     lines = [
         r"\begin{longtable}{llllll}",
-        # Título y etiqueta principales (primera página)
         r"    \toprule",
         r"    Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"    \midrule",
         r"    \endhead",
         r"    ",
-        # Título y encabezado para las páginas siguientes (2, 3, etc.)
         r"    \toprule",
         r"    Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"    \midrule",
         r"    \endlisthead",
         r"    ",
-        # Pie de tabla para páginas intermedias
         r"    \midrule",
         r"    \multicolumn{6}{r}{\textit{Continúa en la página siguiente}} \\",
         r"    \endfoot",
         r"    ",
-        # Pie de tabla para la última página
         r"    \bottomrule",
         r"    \endlastfoot",
     ]
 
-    for dataset in sicap_datasets:
+    for dataset in datasets:
         lines.append(rf"    \multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
         lines.append(r"    \midrule")
 
@@ -154,7 +158,7 @@ def _write_tab10_tex(agg: pd.DataFrame, sicap_datasets: list[str], out: Path) ->
 
     lines += [r"\end{longtable}"]
 
-    tex_path = out / "table_results_sicap.tex"
+    tex_path = out / f"table_results_{suffix}.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Tabla guardada en → {tex_path}")
 
@@ -163,8 +167,8 @@ def _bold_if_best(value: str, metric: float, best: float) -> str:
     return rf"\textbf{{{value}}}" if pd.notna(metric) and metric == best else value
 
 
-def _write_tab11_tex(
-    agg: pd.DataFrame, dist: pd.DataFrame, sicap_datasets: list[str], out: Path
+def _write_tab_comparison_tex(
+    agg: pd.DataFrame, dist: pd.DataFrame, datasets: list[str], out: Path, suffix: str
 ) -> None:
     n_cols = 6
     lines = [
@@ -173,7 +177,7 @@ def _write_tab11_tex(
         r"Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
     ]
-    for i, dataset in enumerate(sicap_datasets):
+    for i, dataset in enumerate(datasets):
         if i > 0:
             lines.append(r"\midrule")
         lines.append(rf"\multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
@@ -234,13 +238,18 @@ def _write_tab11_tex(
             lines.append(" & ".join(cells) + r" \\")
 
     lines += [r"\bottomrule", r"\end{longtable}"]
-    tex_path = out / "table_comparison_sicap.tex"
+    tex_path = out / f"table_comparison_{suffix}.tex"
     tex_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"Saved → {tex_path}")
 
 
-def _plot_sicap_methods(
-    agg: pd.DataFrame, dist: pd.DataFrame, sicap_datasets: list[str], out: Path
+def _plot_methods_comparison(
+    agg: pd.DataFrame,
+    dist: pd.DataFrame,
+    datasets: list[str],
+    out: Path,
+    suffix: str,
+    group_title: str,
 ) -> None:
     methods = ["knn", "mahalanobis", "vae", "ddpm"]
     colors = {
@@ -250,41 +259,56 @@ def _plot_sicap_methods(
         "ddpm": "darkorange",
     }
 
+    # Pre-compute global y_min / y_max across all datasets in this group
+    all_values: list[float] = []
+    for dataset in datasets:
+        for meth in methods:
+            if meth in DISTANCE_METHODS:
+                rows = dist[(dist["dataset"] == dataset) & (dist["method"] == meth)]
+                if not rows.empty:
+                    all_values.append(float(rows.loc[rows["auroc"].idxmax(), "auroc"]))
+            else:
+                sub_agg = agg[(agg["dataset"] == dataset) & (agg["method"] == meth)]
+                if not sub_agg.empty:
+                    all_values.append(float(sub_agg.loc[sub_agg["auroc_mean"].idxmax(), "auroc_mean"]))
+
+    if all_values:
+        shared_ymin = max(0.0, min(all_values) - 0.05)
+        shared_ymin = min(shared_ymin, 0.75)
+        shared_ymax = min(1.0, max(all_values) + 0.03)
+    else:
+        shared_ymin, shared_ymax = 0.0, 1.0
+
     textwidth = 5.65
     fig, axes = plt.subplots(
         1,
-        len(sicap_datasets),
-        figsize=(textwidth * len(sicap_datasets), textwidth * 0.55),
+        len(datasets),
+        figsize=(textwidth * len(datasets), textwidth * 0.55),
         squeeze=False,
     )
 
-    for ax, dataset in zip(axes[0], sicap_datasets, strict=False):
+    for ax, dataset in zip(axes[0], datasets, strict=False):
         values = []
         errors = []
-        labels = []
         for meth in methods:
             if meth in DISTANCE_METHODS:
                 rows = dist[(dist["dataset"] == dataset) & (dist["method"] == meth)]
                 if rows.empty:
                     values.append(float("nan"))
                     errors.append(0.0)
-                    labels.append(meth)
                     continue
                 best = rows.loc[rows["auroc"].idxmax()]
                 values.append(float(best["auroc"]))
                 errors.append(0.0)
-                labels.append(meth)
             else:
                 sub_agg = agg[(agg["dataset"] == dataset) & (agg["method"] == meth)]
                 if sub_agg.empty:
                     values.append(float("nan"))
                     errors.append(0.0)
-                    labels.append(meth)
                     continue
                 b = sub_agg.loc[sub_agg["auroc_mean"].idxmax()]
                 values.append(float(b["auroc_mean"]))
                 errors.append(float(b["auroc_std"]))
-                labels.append(meth)
 
         x = range(len(methods))
         ax.bar(
@@ -298,30 +322,20 @@ def _plot_sicap_methods(
             linewidth=0.6,
         )
         ax.set_xticks(x)
-        ax.set_xticklabels(labels)
-        ###
-        valid_vals = [v for v in values if not np.isnan(v)]
-        if valid_vals:
-            y_min = max(0.0, min(valid_vals) - 0.05)
-            y_max = min(1.0, max(valid_vals) + 0.03)
-
-            y_min = min(y_min, 0.75)
-        else:
-            y_min, y_max = 0.0, 1.0
-        ax.set_ylim(y_min, y_max)
-        ###
+        ax.set_xticklabels(methods)
+        ax.set_ylim(shared_ymin, shared_ymax)
         ax.set_ylabel("AUROC")
         ax.set_title(dataset.upper(), fontsize=12, fontweight="bold")
         ax.grid(True, alpha=0.2, axis="y")
 
-    fig.suptitle("AUROC por método", fontsize=9, fontweight="normal", y=0.97)
+    fig.suptitle(f"AUROC por método — {group_title}", fontsize=9, fontweight="normal", y=0.97)
     plt.tight_layout(rect=[0, 0, 1, 0.92])
     save_figure(
         fig,
-        out / "sicap_methods_comparison.png",
+        out / f"{suffix}_methods_comparison.png",
         run=None,
         image_key=None,
-        artifact_prefix="sicap-methods-comparison",
+        artifact_prefix=f"{suffix}-methods-comparison",
         png_dpi=300,
     )
     plt.close(fig)
@@ -331,8 +345,9 @@ def run_aggregate_tables(
     csv_path: str = "results/summary/comparison.csv",
     out_dir: str = "results/summary",
 ) -> None:
-    """Tab 10: mean±std per (method, lr, score) across seeds.
-    Tab 11: best-per-method comparison across all configs.
+    """Tab 10/10b: mean±std per (method, lr, score) across seeds.
+    Tab 11/11b: best-per-method comparison across all configs.
+    One set of outputs per dataset group (sicap, pathmnist).
     """
     src = Path(csv_path)
     if not src.exists():
@@ -344,33 +359,38 @@ def run_aggregate_tables(
 
     df["t_steps"] = df["experiment_id"].apply(_parse_t_from_id)
 
-    sicap_datasets = [d for d in ("sicap_c1", "sicap_c12") if d in df["dataset"].values]
-    if not sicap_datasets:
-        print("No SICAP data found in CSV. Run exp 3 first.")
-        return
+    any_group_found = False
+    for group_name, candidate_datasets in _DATASET_GROUPS.items():
+        key_datasets = [d for d in candidate_datasets if d in df["dataset"].values]
+        if not key_datasets:
+            continue
+        any_group_found = True
 
-    gen_mask = df["method"].isin(GENERATIVE_METHODS) & df["dataset"].isin(sicap_datasets)
-    gen = df[gen_mask].copy()
+        gen_mask = df["method"].isin(GENERATIVE_METHODS) & df["dataset"].isin(key_datasets)
+        gen = df[gen_mask].copy()
 
-    dist_df = df[df["method"].isin(DISTANCE_METHODS)].copy()
-    dist_df["t_steps"] = 10
-    dist_df["lr"] = np.nan
-    dist_df["score"] = "--"
+        dist_df = df[df["method"].isin(DISTANCE_METHODS) & df["dataset"].isin(key_datasets)].copy()
+        dist_df["t_steps"] = 10
+        dist_df["lr"] = np.nan
+        dist_df["score"] = "--"
 
-    all_data = pd.concat([gen, dist_df], ignore_index=True)
+        all_data = pd.concat([gen, dist_df], ignore_index=True)
 
-    group_keys = ["dataset", "method", "lr", "t_steps", "score"]
-    agg = (
-        all_data.groupby(group_keys, dropna=False)[["auroc", "aupr", "fpr_at_95_tpr"]]
-        .agg(["mean", "std", "count"])
-        .reset_index()
-    )
-    agg.columns = ["_".join(c).rstrip("_") for c in agg.columns]
+        group_keys = ["dataset", "method", "lr", "t_steps", "score"]
+        agg = (
+            all_data.groupby(group_keys, dropna=False)[["auroc", "aupr", "fpr_at_95_tpr"]]
+            .agg(["mean", "std", "count"])
+            .reset_index()
+        )
+        agg.columns = ["_".join(c).rstrip("_") for c in agg.columns]
 
-    _write_tab10_tex(agg, sicap_datasets, out)
+        _write_tab_results_tex(agg, key_datasets, out, suffix=group_name)
 
-    dist_mask = df["method"].isin(DISTANCE_METHODS) & df["dataset"].isin(sicap_datasets)
-    dist = df[dist_mask].copy()
+        dist = df[df["method"].isin(DISTANCE_METHODS) & df["dataset"].isin(key_datasets)].copy()
+        _write_tab_comparison_tex(agg, dist, key_datasets, out, suffix=group_name)
+        _plot_methods_comparison(
+            agg, dist, key_datasets, out, suffix=group_name, group_title=group_name.upper()
+        )
 
-    _write_tab11_tex(agg, dist, sicap_datasets, out)
-    _plot_sicap_methods(agg, dist, sicap_datasets, out)
+    if not any_group_found:
+        print("No key-dataset data found in CSV (need sicap_c1/sicap_c12 or pathmnist_c1/pathmnist_c2).")

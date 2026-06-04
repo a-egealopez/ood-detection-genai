@@ -28,6 +28,10 @@ class ScoreBundle:
     ood_noise_multi_mse: np.ndarray = field(default_factory=lambda: np.array([]))
     id_noise_multi_cosine: np.ndarray = field(default_factory=lambda: np.array([]))
     ood_noise_multi_cosine: np.ndarray = field(default_factory=lambda: np.array([]))
+    id_recon_single: np.ndarray = field(default_factory=lambda: np.array([]))
+    ood_recon_single: np.ndarray = field(default_factory=lambda: np.array([]))
+    id_recon_multi: np.ndarray = field(default_factory=lambda: np.array([]))
+    ood_recon_multi: np.ndarray = field(default_factory=lambda: np.array([]))
     # DDPM with residual space
     id_residual_mah: np.ndarray = field(default_factory=lambda: np.array([]))
     ood_residual_mah: np.ndarray = field(default_factory=lambda: np.array([]))

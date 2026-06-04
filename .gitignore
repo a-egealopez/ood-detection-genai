@@ -63,4 +63,4 @@ Thumbs.db
 *.fdb_latexmk
 *.synctex.gz
 *.blg
-*.bbl
+*.bblresults/wandb/

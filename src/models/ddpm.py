@@ -106,7 +106,8 @@ class ResidualMLPDenoiser(nn.Module):
 
 class DDPMModel(nn.Module, BaseOODModel):
     SCORE_MODES: frozenset[str] = frozenset(
-        {"noise_single", "noise_multi_mse", "noise_multi_cosine", "residual_mah", "residual_knn"}
+        {"noise_single", "noise_multi_mse", "noise_multi_cosine",
+         "recon_single", "recon_multi", "residual_mah", "residual_knn"}
     )
 
     def __init__(
@@ -124,6 +125,7 @@ class DDPMModel(nn.Module, BaseOODModel):
         noise_timestep: int = 100,
         ood_seed: int = 0,
         dropout: float = 0.0,
+        clip_sample: bool = True,
     ) -> None:
         super().__init__()
         self.num_train_timesteps = num_train_timesteps
@@ -148,7 +150,8 @@ class DDPMModel(nn.Module, BaseOODModel):
             beta_end=beta_end,
             prediction_type=prediction_type,
             beta_schedule="squaredcos_cap_v2",
-            clip_sample=False,
+            clip_sample=clip_sample,
+            clip_sample_range=1.0,
         )
         self._recon_fn = nn.MSELoss(reduction="none")
 
@@ -204,6 +207,7 @@ class DDPMModel(nn.Module, BaseOODModel):
         t_start: int,
         capture_timesteps: list[int],
         noise: torch.Tensor | None = None,
+        from_noise: bool = False,
     ) -> dict[int, torch.Tensor]:
         t_start = int(max(1, min(t_start, self.num_train_timesteps - 1)))
         capture = sorted(
@@ -213,8 +217,12 @@ class DDPMModel(nn.Module, BaseOODModel):
         if noise is None:
             noise = torch.randn_like(x)
 
-        t0 = torch.full((x.shape[0],), t_start, device=x.device, dtype=torch.long)
-        current = self.scheduler.add_noise(x, noise, t0)
+        if from_noise:
+            current = noise.clone()
+        else:
+            t0 = torch.full((x.shape[0],), t_start, device=x.device, dtype=torch.long)
+            current = self.scheduler.add_noise(x, noise, t0)
+
         states: dict[int, torch.Tensor] = {}
         if t_start in capture:
             states[t_start] = current.detach().clone()
@@ -398,10 +406,33 @@ class DDPMModel(nn.Module, BaseOODModel):
 
         if mode == "noise_single":
             t = torch.full((b,), self.noise_timestep, device=x.device, dtype=torch.long)
-            x_recon, _, _ = self.reconstruct_at_t(x, t, noise=fixed_noise)
             return self._noise_pred_error(x, t, fixed_noise).cpu().numpy()
 
+        if mode == "recon_single":
+            traj = self.denoise_trajectory(
+                x, t_start=self.recon_timestep, capture_timesteps=[0],
+                noise=fixed_noise, from_noise=False,
+            )
+            return self._mse_score(traj[0], x).cpu().numpy()
+
         score_timesteps = self._score_timesteps(x.device)
+
+        if mode == "recon_multi":
+            if self.ood_reference is None or "recon_multi_stats" not in self.ood_reference:
+                raise RuntimeError("OOD reference not built. Call build_ood_reference() first.")
+            per_level_stats = self.ood_reference["recon_multi_stats"]
+            z_scores: list[torch.Tensor] = []
+            for t_step in score_timesteps:
+                t_key = int(t_step.item())
+                traj = self.denoise_trajectory(
+                    x, t_start=t_key, capture_timesteps=[0],
+                    noise=fixed_noise, from_noise=False,
+                )
+                recon_mse = self._mse_score(traj[0], x)
+                z_scores.append(
+                    (recon_mse - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
+                )
+            return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if mode == "noise_multi_mse":
             if self.ood_reference is None or "noise_multi_stats_mse" not in self.ood_reference:
@@ -462,6 +493,9 @@ class DDPMModel(nn.Module, BaseOODModel):
         residuals: list[np.ndarray] = []
         mse_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
         cosine_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
+        recon_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
+        _MAX_RECON_REF = 512  # cap iterative recon reference (expensive: t denoising steps/sample)
+        n_recon_seen = 0
 
         self.eval()
         for x_batch, _ in tqdm(train_loader, desc="Building OOD reference", leave=False):
@@ -478,23 +512,38 @@ class DDPMModel(nn.Module, BaseOODModel):
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=device, dtype=torch.long)
                 self.scheduler.add_noise(x, fixed_noise, t_batch)
-                # x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
                 noise_err = self._noise_pred_error(x, t_batch, fixed_noise)
                 cosine_err = self._noise_pred_cosine(x, t_batch, fixed_noise)
                 mse_stats_per_t[t_key].extend(noise_err.cpu().tolist())
                 cosine_stats_per_t[t_key].extend(cosine_err.cpu().tolist())
 
+            if n_recon_seen < _MAX_RECON_REF:
+                cap = min(b, _MAX_RECON_REF - n_recon_seen)
+                x_sub = x[:cap]
+                noise_sub = fixed_noise[:cap]
+                for t_step in score_timesteps:
+                    t_key = int(t_step.item())
+                    traj = self.denoise_trajectory(
+                        x_sub, t_start=t_key, capture_timesteps=[0],
+                        noise=noise_sub, from_noise=False,
+                    )
+                    recon_stats_per_t[t_key].extend(
+                        self._mse_score(traj[0], x_sub).cpu().tolist()
+                    )
+                n_recon_seen += cap
+
         residuals_np = np.concatenate(residuals, axis=0)
         ref = build_latent_reference(residuals_np, knn_k=knn_k, normalize_knn=False, reg=1e-5)
 
-        ref["noise_multi_stats_mse"] = {
-            t_key: {"mean": float(np.mean(vals)), "std": float(np.std(vals) + 1e-8)}
-            for t_key, vals in mse_stats_per_t.items()
-        }
-        ref["noise_multi_stats_cosine"] = {
-            t_key: {"mean": float(np.mean(vals)), "std": float(np.std(vals) + 1e-8)}
-            for t_key, vals in cosine_stats_per_t.items()
-        }
+        def _per_t_stats(stats_dict):
+            return {
+                t_key: {"mean": float(np.mean(vals)), "std": float(np.std(vals) + 1e-8)}
+                for t_key, vals in stats_dict.items()
+            }
+
+        ref["noise_multi_stats_mse"]    = _per_t_stats(mse_stats_per_t)
+        ref["noise_multi_stats_cosine"] = _per_t_stats(cosine_stats_per_t)
+        ref["recon_multi_stats"]        = _per_t_stats(recon_stats_per_t)
         return ref
 
     def save(self, path: str) -> None:
@@ -520,4 +569,5 @@ def build_ddpm_model(cfg: DictConfig, device: torch.device) -> DDPMModel:
         noise_timestep=int(m.get("noise_timestep", 250)),
         ood_seed=int(cfg.get("seed", 0)),
         dropout=float(m.get("dropout", 0.0)),
+        clip_sample=bool(m.get("clip_sample", True)),
     ).to(device)

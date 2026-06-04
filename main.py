@@ -33,6 +33,8 @@ SCORE_LABELS: dict[str, str] = {
     "noise_single": "Single-step MSE",
     "noise_multi_mse": "Multi-step MSE (z-score)",
     "noise_multi_cosine": "Multi-step Cosine (z-score)",
+    "recon_single": "Single-step Reconstruction",
+    "recon_multi": "Multi-step Reconstruction",
     "residual_mah": "Residual Mahalanobis",
     "residual_knn": "Residual k-NN",
 }
@@ -48,7 +50,7 @@ def _parse_args():
     )
     p.add_argument(
         "--dataset",
-        choices=["mnist", "sicap_c1", "sicap_c12", "moons", "blobs", "pathmnist"],
+        choices=["mnist", "sicap_c1", "sicap_c12", "moons", "blobs", "pathmnist", "pathmnist_c1", "pathmnist_c2"],
         default="mnist",
     )
     p.add_argument("--seed", type=int)

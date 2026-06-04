@@ -9,6 +9,6 @@ data:
   n_eval_samples: 10000
   num_workers: 0
   pin_memory: false
-  train_classes: [1]
-  test_classes:  [2, 3, 4]
+  id_classes:  [1]
+  ood_classes: [2, 3, 4]
   ood_label: 2

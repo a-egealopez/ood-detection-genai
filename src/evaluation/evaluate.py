@@ -20,6 +20,8 @@ _ALL_MODES: list[tuple[str, str, str]] = [
     ("noise_single", "id_noise_single", "ood_noise_single"),
     ("noise_multi_mse", "id_noise_multi_mse", "ood_noise_multi_mse"),
     ("noise_multi_cosine", "id_noise_multi_cosine", "ood_noise_multi_cosine"),
+    ("recon_single", "id_recon_single", "ood_recon_single"),
+    ("recon_multi", "id_recon_multi", "ood_recon_multi"),
     ("residual_mah", "id_residual_mah", "ood_residual_mah"),
     ("residual_knn", "id_residual_knn", "ood_residual_knn"),
 ]

@@ -86,16 +86,16 @@ def _build_sicap_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     x_test = np.load(root / "X_test.npy").astype(np.float32)
     y_test = np.load(root / "y_test.npy").squeeze().astype(np.int64)
 
-    train_classes = cfg.data.get("train_classes", [1, 2])
-    test_classes = cfg.data.get("test_classes", [3, 4])
+    id_classes  = cfg.data.get("id_classes",  [1, 2])
+    ood_classes = cfg.data.get("ood_classes", [3, 4])
 
-    train_mask = np.isin(y_train, train_classes)
-    id_mask = np.isin(y_test, train_classes)
-    ood_mask = np.isin(y_test, test_classes)
+    train_mask = np.isin(y_train, id_classes)
+    id_mask    = np.isin(y_test,  id_classes)
+    ood_mask   = np.isin(y_test,  ood_classes)
 
-    x_train, y_train = x_train[train_mask], y_train[train_mask]
-    x_test_id, y_test_id = x_test[id_mask], y_test[id_mask]
-    x_test_ood, y_test_ood = x_test[ood_mask], y_test[ood_mask]
+    x_train, y_train       = x_train[train_mask], y_train[train_mask]
+    x_test_id, y_test_id   = x_test[id_mask],     y_test[id_mask]
+    x_test_ood, y_test_ood = x_test[ood_mask],    y_test[ood_mask]
 
     if len(x_train) == 0 or len(x_test_id) == 0 or len(x_test_ood) == 0:
         raise ValueError("Class split produced an empty dataset; check train/test classes.")
@@ -214,34 +214,44 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
         raise ImportError("medmnist is required: pip install medmnist") from None
 
     root = str(cfg.data.get("root", "data/"))
-    norm_label = int(cfg.data.get("norm_label", 6))
-    tum_label = int(cfg.data.get("tum_label", 8))
     n_train = cfg.data.get("n_train_samples", None)
     n_eval = cfg.data.get("n_eval_samples", None)
 
+    # Support both new-style id_classes/ood_classes lists and legacy norm_label/tum_label
+    if cfg.data.get("id_classes") is not None:
+        id_classes = list(cfg.data.id_classes)
+        ood_classes = list(cfg.data.ood_classes)
+    else:
+        id_classes = [int(cfg.data.get("norm_label", 6))]
+        ood_classes = [int(cfg.data.get("tum_label", 8))]
+
     train_ds = PathMNIST(split="train", download=True, root=root)
-    test_ds = PathMNIST(split="test", download=True, root=root)
+    test_ds  = PathMNIST(split="test",  download=True, root=root)
 
-    def to_float(imgs: np.ndarray) -> np.ndarray:
-        # (N, 28, 28, 3) uint8 -> (N, 2352) float32 in [-1, 1]
-        x = imgs.astype(np.float32) / 255.0
-        x = (x - 0.5) / 0.5
-        return x.transpose(0, 3, 1, 2).reshape(-1, 3 * 28 * 28)
+    def to_chw_flat(imgs: np.ndarray) -> np.ndarray:
+        # (N, H, W, C) uint8 -> (N, C*H*W) float32 in [0, 1] — no normalization yet
+        return imgs.astype(np.float32).transpose(0, 3, 1, 2).reshape(-1, 3 * 28 * 28) / 255.0
 
-    x_train_all = to_float(train_ds.imgs)
+    x_train_all = to_chw_flat(train_ds.imgs)
     y_train_all = train_ds.labels.squeeze()
-    x_test_all = to_float(test_ds.imgs)
-    y_test_all = test_ds.labels.squeeze()
+    x_test_all  = to_chw_flat(test_ds.imgs)
+    y_test_all  = test_ds.labels.squeeze()
 
-    x_train = x_train_all[y_train_all == norm_label]
-    y_train = y_train_all[y_train_all == norm_label]
-    x_id = x_test_all[y_test_all == norm_label]
-    y_id = y_test_all[y_test_all == norm_label]
-    x_ood = x_test_all[y_test_all == tum_label]
-    y_ood = y_test_all[y_test_all == tum_label]
+    train_mask = np.isin(y_train_all, id_classes)
+    id_mask    = np.isin(y_test_all,  id_classes)
+    ood_mask   = np.isin(y_test_all,  ood_classes)
+
+    x_train, y_train = x_train_all[train_mask], y_train_all[train_mask]
+    x_id,    y_id    = x_test_all[id_mask],     y_test_all[id_mask]
+    x_ood,   y_ood   = x_test_all[ood_mask],    y_test_all[ood_mask]
 
     if len(x_train) == 0 or len(x_id) == 0 or len(x_ood) == 0:
         raise ValueError("PathMNIST class filtering produced an empty split.")
+
+    # Normalization statistics from training data only (same pattern as sicap)
+    mean = x_train.mean(axis=0, keepdims=True)
+    std  = x_train.std(axis=0,  keepdims=True)
+    std  = np.where(std < 1e-6, 1.0, std)
 
     def first_n(x, y, n):
         if n is None:
@@ -250,23 +260,19 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
         return x[:n], y[:n]
 
     x_train, y_train = first_n(x_train, y_train, n_train)
-    x_id, y_id = first_n(x_id, y_id, n_eval)
-    x_ood, y_ood = first_n(x_ood, y_ood, n_eval)
+    x_id,    y_id    = first_n(x_id,    y_id,    n_eval)
+    x_ood,   y_ood   = first_n(x_ood,   y_ood,   n_eval)
 
-    def to_ds(x, y):
-        return TensorDataset(
-            torch.from_numpy(x).float(),
-            torch.from_numpy(y.astype(np.int64)).long(),
-        )
-
+    id_tag  = "+".join(str(c) for c in id_classes)
+    ood_tag = "+".join(str(c) for c in ood_classes)
     datasets = {
-        "train": to_ds(x_train, y_train),
-        "id_eval": to_ds(x_id, y_id),
-        "ood_eval": to_ds(x_ood, y_ood),
+        "train":    _to_tensor_dataset(x_train, y_train, mean, std),
+        "id_eval":  _to_tensor_dataset(x_id,    y_id,    mean, std),
+        "ood_eval": _to_tensor_dataset(x_ood,   y_ood,   mean, std),
     }
     return datasets, DataLoaderSpec(
-        id_name="PathMNIST-NORM",
-        ood_name="PathMNIST-TUM",
+        id_name=f"PathMNIST-ID{id_tag}",
+        ood_name=f"PathMNIST-OOD{ood_tag}",
         input_dim=3 * 28 * 28,
         is_image=True,
     )
@@ -279,6 +285,8 @@ _DATASET_BUILDERS = {
     "moons": _build_toy_dataset,
     "blobs": _build_blobs_dataset,
     "pathmnist": _build_pathmnist_dataset,
+    "pathmnist_c1": _build_pathmnist_dataset,
+    "pathmnist_c2": _build_pathmnist_dataset,
 }
 
 

@@ -1,0 +1,13 @@
+# In-distribution:     PathMNIST class 6 (Adipose — one-class scenario)
+# Out-of-distribution: classes 7 (Empty) and 8 (Stroma/Tumour)
+
+data:
+  dataset: pathmnist_c1
+  root: data/
+  id_classes: [6]
+  ood_classes: [7, 8]
+  n_train_samples: null
+  n_eval_samples: null
+  input_dim: ???
+  num_workers: 2
+  pin_memory: true

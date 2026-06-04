@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 
-SEED="${SEED:-42}"
+# ── Dataset groups ────────────────────────────────────────────────────────────
 TOY_DATASETS="${TOY_DATASETS:-moons blobs}"
 SICAP_DATASETS="${SICAP_DATASETS:-sicap_c1 sicap_c12}"
+PATH_DATASETS="${PATH_DATASETS:-pathmnist_c1 pathmnist_c2}"
+
+# ── Single-run seeds / LRs (toy, mnist) ───────────────────────────────────────
+SEED="${SEED:-42}"
+
 SEED_TOY="${SEED_TOY:-42}"
 LR_VAE_TOY="${LR_VAE_TOY:-1e-3}"
 LR_DDPM_TOY="${LR_DDPM_TOY:-1e-3}"
@@ -11,23 +16,35 @@ SEED_MNIST="${SEED_MNIST:-42}"
 LR_VAE_MNIST="${LR_VAE_MNIST:-1e-4}"
 LR_DDPM_MNIST="${LR_DDPM_MNIST:-1e-4}"
 
-SEED_PATH="${SEED_PATH:-42}"
-LR_VAE_PATH="${LR_VAE_PATH:-1e-4}"
-LR_DDPM_PATH="${LR_DDPM_PATH:-1e-4}"
-
+# ── Multi-seed / multi-LR for key experiments (sicap + pathmnist) ─────────────
 SEEDS="${SEEDS:-42 107 2024}"
 LRS_VAE="${LRS_VAE:-1e-4 5e-4 1e-3}"
 LRS_DDPM="${LRS_DDPM:-1e-4 5e-4 1e-3}"
 
+SEEDS_PATH="${SEEDS_PATH:-42 107 2024}"
+LRS_VAE_PATH="${LRS_VAE_PATH:-1e-4 5e-4 1e-3}"
+LRS_DDPM_PATH="${LRS_DDPM_PATH:-1e-4 5e-4 1e-3}"
 
+# ── T-ablation best configs ───────────────────────────────────────────────────
 T_VALUES="${T_VALUES:-5 10 25 50}"
+
 BEST_SEED="${BEST_SEED:-42}"
 BEST_LR_DDPM="${BEST_LR_DDPM:-1e-4}"
 
+BEST_SEED_PATH="${BEST_SEED_PATH:-42}"
+BEST_LR_DDPM_PATH="${BEST_LR_DDPM_PATH:-1e-4}"
+
+# ── Output paths ──────────────────────────────────────────────────────────────
 LOGS_DIR="${LOGS_DIR:-results/evaluation}"
 OUT_CSV="${OUT_CSV:-results/summary/comparison.csv}"
 
-# --- utilities ---
+# ── Utilities ─────────────────────────────────────────────────────────────────
+MODEL=${MODEL:-both}
+should_run() {
+    local target_model=$1
+    [[ "$MODEL" == "both" || "$MODEL" == "$target_model" ]]
+}
+
 gpu_select() {
     if command -v nvidia-smi &>/dev/null; then
         CUDA_VISIBLE_DEVICES=$(nvidia-smi --query-gpu=index,memory.free \
