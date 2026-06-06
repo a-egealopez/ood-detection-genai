@@ -30,14 +30,25 @@ def _apply_suptitle(fig: plt.Figure, title: str, rect_bottom: float = 0.0) -> No
     fig.tight_layout(rect=[0, rect_bottom, 1, 0.94])
 
 
-def render_cell(ax: plt.Axes, tensor: torch.Tensor, is_image: bool, color: str) -> None:
+def render_cell(
+    ax: plt.Axes,
+    tensor: torch.Tensor,
+    is_image: bool,
+    color: str,
+    denorm_fn=None,
+) -> None:
     arr = tensor.squeeze().cpu().numpy()
     if is_image:
         if arr.size == 784:
             ax.imshow(arr.reshape(28, 28), cmap="gray", vmin=-1, vmax=1)
         else:
-            img = arr.reshape(3, 28, 28).transpose(1, 2, 0)
-            ax.imshow(np.clip(img * 0.5 + 0.5, 0, 1))
+            img = arr.reshape(3, 28, 28).transpose(1, 2, 0).astype(np.float32)
+            if denorm_fn is not None:
+                img = denorm_fn(img)
+            else:
+                lo, hi = img.min(), img.max()
+                img = (img - lo) / (hi - lo + 1e-8) if hi > lo else img * 0.0
+            ax.imshow(img.clip(0, 1))
     else:
         ax.plot(arr, color=color, lw=1.0)
         ax.grid(True, alpha=0.2)
@@ -100,6 +111,7 @@ _SCORE_GROUPS: list[list[str]] = [
     ["recon", "elbo"],
     ["latent_knn", "latent_mah"],
     ["noise_single", "noise_multi_mse", "noise_multi_cosine"],
+    ["recon_single", "recon_multi"],
     ["residual_mah", "residual_knn"],
 ]
 

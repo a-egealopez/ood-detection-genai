@@ -66,14 +66,14 @@ exp_1() { exp_1_train; exp_1_eval; }
 
 exp_2_train() {
     log_info "[2_train] mnist train"
-    should_run vae && run_loop --skip-eval vae  mnist "$SEED_MNIST" "$LR_VAE_MNIST"
-    should_run ddpm && run_loop --skip-eval ddpm mnist "$SEED_MNIST" "$LR_DDPM_MNIST"
+    should_run vae && run_loop --skip-eval vae       mnist "$SEED_MNIST" "$LR_VAE_MNIST"
+    should_run ddpm && run_loop --skip-eval ddpm_mnist mnist "$SEED_MNIST" "$LR_DDPM_MNIST"
 }
 
 exp_2_eval() {
     log_info "[2_eval] mnist eval"
-    should_run vae && run_loop --skip-train vae  mnist "$SEED_MNIST" "$LR_VAE_MNIST"
-    should_run ddpm && run_loop --skip-train ddpm mnist "$SEED_MNIST" "$LR_DDPM_MNIST"
+    should_run vae && run_loop --skip-train vae       mnist "$SEED_MNIST" "$LR_VAE_MNIST"
+    should_run ddpm && run_loop --skip-train ddpm_mnist mnist "$SEED_MNIST" "$LR_DDPM_MNIST"
 }
 
 exp_2() { exp_2_train; exp_2_eval; }
@@ -103,16 +103,16 @@ exp_3() { exp_3_train; exp_3_eval; }
 exp_4_train() {
     log_info "[4_train] sicap train (datasets=sicap_c1 sicap_c12 seeds=$SEEDS)"
     for dataset in $SICAP_DATASETS; do
-        should_run vae && run_loop --skip-eval vae  "$dataset" "$SEEDS" "$LRS_VAE"
-        should_run ddpm && run_loop --skip-eval ddpm "$dataset" "$SEEDS" "$LRS_DDPM"
+        should_run vae  && run_loop --skip-eval vae       "$dataset" "$SEEDS" "$LRS_VAE"
+        should_run ddpm && run_loop --skip-eval ddpm_sicap "$dataset" "$SEEDS" "$LRS_DDPM"
     done
 }
 
 exp_4_eval() {
     log_info "[4_eval] sicap eval (datasets=sicap_c1 sicap_c12 seeds=$SEEDS)"
     for dataset in $SICAP_DATASETS; do
-        should_run vae && run_loop --skip-train vae  "$dataset" "$SEEDS" "$LRS_VAE"
-        should_run ddpm && run_loop --skip-train ddpm "$dataset" "$SEEDS" "$LRS_DDPM"
+        should_run vae  && run_loop --skip-train vae       "$dataset" "$SEEDS" "$LRS_VAE"
+        should_run ddpm && run_loop --skip-train ddpm_sicap "$dataset" "$SEEDS" "$LRS_DDPM"
     done
 }
 
@@ -124,10 +124,10 @@ exp_5() {
     log_info "[5] ddpm T ablation — sicap (seed=$BEST_SEED lr=$BEST_LR_DDPM T=$T_VALUES)"
     for dataset in $SICAP_DATASETS; do
         for t in $T_VALUES; do
-            log_info "[ddpm] $dataset T=$t"
-            run_timed "ddpm/$dataset/T$t" \
+            log_info "[ddpm_sicap] $dataset T=$t"
+            run_timed "ddpm_sicap/$dataset/T$t" \
                 --mode reconstruction-method \
-                --experiment ddpm --dataset "$dataset" \
+                --experiment ddpm_sicap --dataset "$dataset" \
                 --lr "$BEST_LR_DDPM" --seed "$BEST_SEED" \
                 --n-score-steps "$t" --skip-train
         done

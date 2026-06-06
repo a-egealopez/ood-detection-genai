@@ -63,6 +63,16 @@ _SUPTITLE_KW = dict(fontsize=9, fontweight="normal", y=0.97)
 _SUPTITLE_RECT = [0, 0, 1, 0.92]
 
 
+def _make_denorm(cfg):
+    img_mean = cfg.data.get("img_mean", None)
+    img_std = cfg.data.get("img_std", None)
+    if img_mean is None or img_std is None:
+        return None
+    mean = np.array(img_mean, dtype=np.float32)
+    std = np.array(img_std, dtype=np.float32)
+    return lambda img: img * std + mean
+
+
 def stage_input_space_viz(ctx: StageContext) -> None:
     metadata = DatasetMetadata.from_cfg(ctx.cfg)
     try:
@@ -341,26 +351,27 @@ def _build_reconstruction_fig_vae(
     is_image = bool(ctx.cfg.data.get("is_image", False))
     ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
+    denorm_fn = _make_denorm(ctx.cfg)
 
     if compact:
         fig, axes = plt.subplots(2, n_samples * 2, figsize=(textwidth, style.FIG_H1), squeeze=False)
 
         for col in range(n_samples):
             axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
-            render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue")
+            render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue", denorm_fn)
             axes[1, col].set_ylabel(
                 "ID reconstructed", fontsize=9, fontweight="bold", color="steelblue"
             )
-            render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue")
+            render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue", denorm_fn)
 
         for col in range(n_samples, n_samples * 2):
             idx = col - n_samples
             axes[0, col].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
-            render_cell(axes[0, col], x_ood[idx].cpu(), is_image, "tomato")
+            render_cell(axes[0, col], x_ood[idx].cpu(), is_image, "tomato", denorm_fn)
             axes[1, col].set_ylabel(
                 "OOD reconstructed", fontsize=9, fontweight="bold", color="tomato"
             )
-            render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato")
+            render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato", denorm_fn)
 
     else:
         fig, axes = plt.subplots(4, n_samples, figsize=(2.0 * n_samples, 2.0 * 4))
@@ -375,8 +386,8 @@ def _build_reconstruction_fig_vae(
                 axes[1, col].set_ylabel(
                     "ID reconstructed", fontsize=10, fontweight="bold", color="steelblue"
                 )
-            render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue")
-            render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue")
+            render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue", denorm_fn)
+            render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue", denorm_fn)
 
             # Bloque Inferior: OOD
             if col == 0:
@@ -386,8 +397,8 @@ def _build_reconstruction_fig_vae(
                 axes[3, col].set_ylabel(
                     "OOD reconstructed", fontsize=10, fontweight="bold", color="tomato"
                 )
-            render_cell(axes[2, col], x_ood[col].cpu(), is_image, "tomato")
-            render_cell(axes[3, col], x_recon_ood[col].cpu(), is_image, "tomato")
+            render_cell(axes[2, col], x_ood[col].cpu(), is_image, "tomato", denorm_fn)
+            render_cell(axes[3, col], x_recon_ood[col].cpu(), is_image, "tomato", denorm_fn)
 
     plt.tight_layout(rect=_SUPTITLE_RECT)
     return fig
@@ -400,6 +411,7 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
     mode = str(ctx.cfg.viz.get("ddpm_timestep_grid_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
+    denorm_fn = _make_denorm(ctx.cfg)
 
     if mode == "full":
         keyframes = _ddpm_keyframes(max_t)
@@ -444,10 +456,10 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
         ]
         for row, (title, batch, color, t_vals) in enumerate(rows_spec):
             axes[row, 0].set_ylabel(title, fontsize=9, fontweight="bold", color=color)
-            render_cell(axes[row, 0], batch[0].cpu(), is_image, color)
+            render_cell(axes[row, 0], batch[0].cpu(), is_image, color, denorm_fn)
             for col in range(len(keyframes)):
                 ax = axes[row, col + 1]
-                render_cell(ax, batch[col].cpu(), is_image, color)
+                render_cell(ax, batch[col].cpu(), is_image, color, denorm_fn)
                 if t_vals is not None:
                     ax.set_title(f"t={t_vals[col].item()}", fontsize=7, color=color, pad=2)
 
@@ -504,13 +516,13 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
     ]):
         r_tw = row_base * 2
         r_it = row_base * 2 + 1
-        render_cell(axes[r_tw, 0], x_orig[0].cpu(), is_image, color)
+        render_cell(axes[r_tw, 0], x_orig[0].cpu(), is_image, color, denorm_fn)
         axes[r_tw, 0].set_ylabel(f"{tag}\nTweedie",   fontsize=9, fontweight="bold", color=color)
-        render_cell(axes[r_it, 0], x_orig[0].cpu(), is_image, color)
+        render_cell(axes[r_it, 0], x_orig[0].cpu(), is_image, color, denorm_fn)
         axes[r_it, 0].set_ylabel(f"{tag}\nIterative", fontsize=9, fontweight="bold", color=color)
         for idx in range(len(compact_steps)):
-            render_cell(axes[r_tw, idx + 1], tw_list[idx], is_image, color)
-            render_cell(axes[r_it, idx + 1], it_list[idx], is_image, color)
+            render_cell(axes[r_tw, idx + 1], tw_list[idx], is_image, color, denorm_fn)
+            render_cell(axes[r_it, idx + 1], it_list[idx], is_image, color, denorm_fn)
 
     plt.tight_layout(rect=_SUPTITLE_RECT)
     return fig
@@ -521,13 +533,14 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
 
     dataset_config_name = str(ctx.cfg.data.get("dataset", "")).lower()
     if "pathmnist" in dataset_config_name:
-        max_t = 150  # problemas por falta de embedding
+        pass  # problemas por falta de embedding
     else:
-        max_t = int(ctx.model.num_train_timesteps * 0.25)  # 1000 * 0.25 = 250
+        int(ctx.model.num_train_timesteps * 0.25)  # 1000 * 0.25 = 250
     mode = str(ctx.cfg.viz.get("ddpm_denoising_trajectory_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
     ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
+    denorm_fn = _make_denorm(ctx.cfg)
 
     T = ctx.model.num_train_timesteps
     t_gen = T - 1
@@ -547,15 +560,20 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
                 )
             )
 
-        ordered = sorted(keyframes)
+        ordered = sorted(keyframes, reverse=True)
         n_cols_full = len(ordered)
         fig, axes = plt.subplots(n_runs, n_cols_full, figsize=(2.0 * n_cols_full, 1.8 * n_runs))
         fig.suptitle(f"Denoising trajectory — {metadata.id_name}", **_SUPTITLE_KW)
         for r, traj in enumerate(trajs):
             axes[r, 0].set_ylabel(f"Run {r + 1}", fontsize=9, fontweight="bold")
             for c, t in enumerate(ordered):
-                token = "z~N(0,I)" if t == t_gen else ("x̂₀" if t == 0 else f"t={t}")
-                render_cell(axes[r, c], traj[t][0].cpu(), is_image, "steelblue")
+                if t == t_gen:
+                    token = "z ~ N(0,I)"
+                elif t == 0:
+                    token = "x̂₀"
+                else:
+                    token = f"t={t}"
+                render_cell(axes[r, c], traj[t][0].cpu(), is_image, "steelblue", denorm_fn)
                 axes[r, c].set_title(token, fontsize=7)
         plt.tight_layout(rect=_SUPTITLE_RECT)
         return fig
@@ -584,22 +602,19 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
             if t == t_gen:
                 token = "z ~ N(0,I)"
             elif t == 0:
-                token = "x̂₀ (generated)"
+                token = "x̂₀"
             else:
                 token = f"x_t  (t={t})"
-            render_cell(axes[row, c], traj[int(t)][0].cpu(), is_image, "steelblue")
+            render_cell(axes[row, c], traj[int(t)][0].cpu(), is_image, "steelblue", denorm_fn)
             axes[row, c].set_title(token, fontsize=8)
 
     plt.tight_layout(rect=_SUPTITLE_RECT)
     return fig
 
 
-def _ddpm_keyframes(max_t: int) -> list[int]:
-    t, frames = max_t, []
-    while t >= 1:
-        frames.append(t)
-        t //= 2
-    return frames[::-1]
+def _ddpm_keyframes(max_t: int, n: int = 7) -> list[int]:
+    T = max_t + 1
+    return [min(int(round(T * i / (n - 1))), max_t) for i in range(n)]
 
 
 def _show_save_log(

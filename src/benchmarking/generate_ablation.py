@@ -93,8 +93,18 @@ def _write_ablation_tex(
         lines.append(r"\midrule")
         sub = grouped_all[grouped_all["dataset"] == dataset]
         for mode in _DDPM_SCORE_MODES:
-            mode_data = sub[sub["score"] == mode].set_index("T")["AUROC"]
-            cells = [f"{mode_data[t]:.4f}" if t in mode_data.index else "--" for t in t_vals_all]
+            mode_sub = sub[sub["score"] == mode].set_index("T")
+            cells = []
+            for t in t_vals_all:
+                if t not in mode_sub.index:
+                    cells.append("--")
+                    continue
+                mean = mode_sub.loc[t, "AUROC"]
+                std = mode_sub.loc[t, "AUROC_std"]
+                if pd.notna(std) and std > 0:
+                    cells.append(f"${mean:.4f} \\pm {std:.4f}$")
+                else:
+                    cells.append(f"{mean:.4f}")
             lines.append(_MODE_LABELS[mode] + " & " + " & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / f"table_ablation_t_{suffix}.tex"
@@ -219,9 +229,9 @@ def run_t_ablation(
 
         grouped_all = (
             group_abl.groupby(["dataset", "score", "t_steps"])["auroc"]
-            .mean()
+            .agg(["mean", "std"])
             .reset_index()
-            .rename(columns={"t_steps": "T", "auroc": "AUROC"})
+            .rename(columns={"t_steps": "T", "mean": "AUROC", "std": "AUROC_std"})
         )
         t_vals_all = sorted(group_abl["t_steps"].dropna().unique().astype(int))
         _write_ablation_tex(grouped_all, t_vals_all, datasets, out, suffix=group_name)

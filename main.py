@@ -58,7 +58,7 @@ def _parse_args():
 
     p.add_argument(
         "--experiment",
-        choices=["vae", "ddpm", "vae_toy", "ddpm_toy", "vae_path", "ddpm_path"],
+        choices=["vae", "ddpm", "ddpm_mnist", "ddpm_sicap", "vae_toy", "ddpm_toy", "vae_path", "ddpm_path"],
         default="vae",
     )
     p.add_argument("--lr", type=float)
@@ -148,24 +148,23 @@ def _mode_reconstruction_method(args):
         cfg.seed = args.seed
 
     cfg.method = "reconstruction-method"
-    cfg.experiment_name = build_experiment_id(cfg)
-    train_experiment_id = str(cfg.experiment_name)
+    train_experiment_id = build_experiment_id(cfg)  # base, sin _t — T no afecta al modelo
     cfg.training.checkpoint_dir = f"results/training/{train_experiment_id}/checkpoints"
     cfg.viz.train_plots_dir = f"results/training/{train_experiment_id}/plots"
 
     if args.n_score_steps is not None and str(cfg.model.get("model_type", "")) == "ddpm":
-        frozen_ckpt_dir = str(cfg.training.checkpoint_dir)
-        frozen_train_plots_dir = str(cfg.viz.train_plots_dir)
         cfg.model.n_score_steps = args.n_score_steps
-        cfg.training.checkpoint_dir = frozen_ckpt_dir
-        cfg.viz.train_plots_dir = frozen_train_plots_dir
-        cfg.experiment_name = build_experiment_id(cfg)
 
-    eval_experiment_id = str(cfg.experiment_name)
+    # Para DDPM el ID de eval incluye _t para distinguir runs del ablation
+    if "ddpm" in str(cfg.model.get("model_type", "")):
+        eval_experiment_id = f"{train_experiment_id}_t{int(cfg.model.get('n_score_steps', 10))}"
+    else:
+        eval_experiment_id = train_experiment_id
+    cfg.experiment_name = eval_experiment_id
     cfg.viz.eval_plots_dir = f"results/evaluation/{eval_experiment_id}/plots"
     cfg.evaluation.results_dir = f"results/evaluation/{eval_experiment_id}"
 
-    cfg.wandb.run_name = cfg.experiment_name
+    cfg.wandb.run_name = eval_experiment_id
 
     print(f"{MODE_LABELS[cfg.method]} — {cfg.experiment_name}")
 

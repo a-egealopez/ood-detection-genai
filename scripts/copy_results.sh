@@ -42,8 +42,8 @@ results-summary-ablation_t_auroc_sicap.pdf
 results-summary-ablation_t_auroc_pathmnist.pdf
 results-summary-sicap_methods_comparison.pdf
 results-summary-pathmnist_methods_comparison.pdf
-results-training-ddpm_sicap_c12_s42_lr0.0001_t10-plots-training_curves.pdf
-results-training-ddpm_sicap_c1_s42_lr0.0001_t10-plots-training_curves.pdf
+results-training-ddpm_sicap_c12_s42_lr0.0001-plots-training_curves.pdf
+results-training-ddpm_sicap_c1_s42_lr0.0001-plots-training_curves.pdf
 results-training-vae_sicap_c12_s42_lr0.0001-plots-training_curves.png
 results-training-vae_sicap_c1_s42_lr0.0001-plots-training_curves.pdf
 results-evaluation-vae_mnist_s42_lr0.0001-plots-reconstructions_full.pdf

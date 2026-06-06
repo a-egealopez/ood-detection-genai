@@ -1,8 +1,12 @@
 import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+import wandb
+from omegaconf import DictConfig
 
 os.environ.setdefault("WANDB_DIR", str(Path(__file__).parent.parent / "results" / "wandb"))
 
@@ -14,10 +18,6 @@ if _env_file.exists():
             _k, _v = _line.split("=", 1)
             if _k.strip() != "WANDB_API_KEY":
                 os.environ.setdefault(_k.strip(), _v.strip())
-
-import wandb
-from omegaconf import DictConfig
-
 
 class _NoOpRun:
     url = "(wandb disabled)"
@@ -39,12 +39,16 @@ def build_wandb_run(cfg: DictConfig) -> wandb.sdk.wandb_run.Run | _NoOpRun:
     if not cfg.wandb.enabled:
         return _NoOpRun()
 
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_name = f"{cfg.wandb.run_name}_{timestamp}"
+
     try:
         from omegaconf import OmegaConf
 
         run = wandb.init(
             project=cfg.wandb.project,
-            name=cfg.wandb.run_name,
+            name=run_name,
+            group=cfg.wandb.run_name,
             tags=list(cfg.wandb.tags),
             config=OmegaConf.to_container(cfg, resolve=True),
         )
@@ -57,11 +61,7 @@ def build_wandb_run(cfg: DictConfig) -> wandb.sdk.wandb_run.Run | _NoOpRun:
 def build_experiment_id(cfg) -> str:
     if cfg.method == "distance-method":
         return f"dist_{cfg.distance_type}_{cfg.data.dataset}_s{cfg.seed}"
-
-    base = f"{cfg.model.model_type}_{cfg.data.dataset}_s{cfg.seed}_lr{cfg.training.lr}"
-    if "ddpm" in str(cfg.model.get("model_type", "")):
-        base += f"_t{cfg.model.n_score_steps}"
-    return base
+    return f"{cfg.model.model_type}_{cfg.data.dataset}_s{cfg.seed}_lr{cfg.training.lr}"
 
 
 def _slug(text: str) -> str:

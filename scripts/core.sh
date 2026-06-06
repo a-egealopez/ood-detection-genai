@@ -29,10 +29,10 @@ LRS_DDPM_PATH="${LRS_DDPM_PATH:-1e-4 5e-4 1e-3}"
 T_VALUES="${T_VALUES:-5 10 25 50}"
 
 BEST_SEED="${BEST_SEED:-42}"
-BEST_LR_DDPM="${BEST_LR_DDPM:-1e-4}"
+BEST_LR_DDPM="${BEST_LR_DDPM:-1e-3}"
 
 BEST_SEED_PATH="${BEST_SEED_PATH:-42}"
-BEST_LR_DDPM_PATH="${BEST_LR_DDPM_PATH:-1e-4}"
+BEST_LR_DDPM_PATH="${BEST_LR_DDPM_PATH:-1e-3}"
 
 # ── Output paths ──────────────────────────────────────────────────────────────
 LOGS_DIR="${LOGS_DIR:-results/evaluation}"

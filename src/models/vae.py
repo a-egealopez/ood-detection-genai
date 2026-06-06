@@ -9,12 +9,11 @@ from src.evaluation.plot import plot_embeddings
 from .base_model import BaseOODModel
 from .ood_scorers import DEFAULT_KNN_K, build_latent_reference, compute_ood_score
 
-
 def _build_encoder_body(input_dim: int, hidden_dim: int, depth: int) -> nn.Sequential:
-    layers: list[nn.Module] = []
+    layers = []
     prev = input_dim
     for _ in range(depth):
-        layers += [nn.Linear(prev, hidden_dim), nn.ReLU()]
+        layers += [nn.Linear(prev, hidden_dim), nn.LeakyReLU(0.2, inplace=True)]
         prev = hidden_dim
     return nn.Sequential(*layers)
 

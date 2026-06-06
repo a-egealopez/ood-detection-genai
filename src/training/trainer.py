@@ -87,7 +87,7 @@ def _validation_loss(
         for x, _ in loader:
             x = x.to(device)
             losses = model.compute_loss(x, kl_weight)
-            values.append(float(losses["total"].item()))
+            values.append(float(next(iter(losses.values())).item()))
     model.train()
 
     if ema is not None:
@@ -223,7 +223,7 @@ def train_model(
             optimizer.zero_grad()
 
             L = model.compute_loss(x, kl_weight)
-            L["total"].backward()
+            next(iter(L.values())).backward()
 
             if grad_clip > 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
@@ -235,8 +235,7 @@ def train_model(
                 totals[k] = totals.get(k, 0.0) + v.item()
             n += 1
 
-            postfix = {k: f"{totals[k] / n:.4f}" for k in totals if k != "total"}
-            postfix["total"] = f"{totals['total'] / n:.4f}"
+            postfix = {k: f"{totals[k] / n:.4f}" for k in totals}
             if kl_weight > 0:
                 postfix["kl_w"] = f"{kl_weight:.2e}"
             pbar.set_postfix(postfix)

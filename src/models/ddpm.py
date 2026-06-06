@@ -27,36 +27,18 @@ class SinusoidalPosEmb(nn.Module):
         return torch.cat([emb.sin(), emb.cos()], dim=-1)
 
 
-class GroupNorm1d(nn.Module):
-    def __init__(self, channels: int, num_groups: int = 8) -> None:
-        super().__init__()
-        groups = min(num_groups, channels)
-        while channels % groups != 0 and groups > 1:
-            groups -= 1
-        self.gn = nn.GroupNorm(groups, channels)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.gn(x.unsqueeze(-1)).squeeze(-1)
-
-
 class ResidualMLPBlock(nn.Module):
     def __init__(self, hidden_dim: int, time_emb_dim: int, dropout: float = 0.0) -> None:
         super().__init__()
+        self.norm = nn.LayerNorm(hidden_dim)
+        self.ff = nn.Linear(hidden_dim, hidden_dim)
         self.time_proj = nn.Linear(time_emb_dim, hidden_dim)
-        self.norm1 = GroupNorm1d(hidden_dim)
-        self.fc1 = nn.Linear(hidden_dim, hidden_dim)
-        self.norm2 = GroupNorm1d(hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.act = nn.SiLU()
-        self.drop = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+        self.act = nn.GELU()
+        self.drop = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
-    def forward(self, h: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
-        residual = h
-        h = h + self.time_proj(t_emb)
-        h = self.fc1(self.act(self.norm1(h)))
-        h = self.drop(h)
-        h = self.fc2(self.act(self.norm2(h)))
-        return residual + h
+    def forward(self, x: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
+        h = self.act(self.ff(self.norm(x)) + self.time_proj(t_emb))
+        return x + self.drop(h)
 
 
 class ResidualMLPDenoiser(nn.Module):
@@ -72,7 +54,7 @@ class ResidualMLPDenoiser(nn.Module):
         self.time_mlp = nn.Sequential(
             SinusoidalPosEmb(time_emb_dim),
             nn.Linear(time_emb_dim, time_emb_dim * 2),
-            nn.SiLU(),
+            nn.GELU(),
             nn.Linear(time_emb_dim * 2, time_emb_dim),
         )
         self.in_proj = nn.Linear(input_dim, hidden_dim)
@@ -82,9 +64,9 @@ class ResidualMLPDenoiser(nn.Module):
                 for _ in range(max(depth, 1))
             ]
         )
-        self.out_norm = GroupNorm1d(hidden_dim)
+        self.out_norm = nn.LayerNorm(hidden_dim)
         self.out_proj = nn.Linear(hidden_dim, input_dim)
-        self.act = nn.SiLU()
+        self.act = nn.GELU()
         self.apply(self._init_weights)
 
     @staticmethod
@@ -98,10 +80,10 @@ class ResidualMLPDenoiser(nn.Module):
         b = x.shape[0]
         x_flat = x.reshape(b, -1)
         t_emb = self.time_mlp(t.float())
-        h = self.in_proj(x_flat)
+        h = self.act(self.in_proj(x_flat))
         for blk in self.blocks:
             h = blk(h, t_emb)
-        return self.out_proj(self.act(self.out_norm(h))).view_as(x)
+        return self.out_proj(self.out_norm(h)).view_as(x)
 
 
 class DDPMModel(nn.Module, BaseOODModel):
@@ -184,7 +166,7 @@ class DDPMModel(nn.Module, BaseOODModel):
             target = x
 
         pred = self.model(x_noisy, t)
-        return {"total": self._recon_fn(pred, target).mean()}
+        return {"noise_mse": self._recon_fn(pred, target).mean()}
 
     @torch.no_grad()
     def reconstruct_at_t(
@@ -391,7 +373,7 @@ class DDPMModel(nn.Module, BaseOODModel):
 
     def _score_timesteps(self, device: torch.device) -> torch.Tensor:
         t_min = max(1, int(self.num_train_timesteps * 0.10))
-        t_max = int(self.num_train_timesteps * 0.60)
+        t_max = int(self.num_train_timesteps * 0.90)
         return torch.linspace(t_min, t_max, self.n_score_steps, dtype=torch.long, device=device)
 
     @torch.no_grad()

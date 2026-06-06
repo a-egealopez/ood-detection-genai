@@ -31,6 +31,7 @@ results/evaluation/
 results/summary/
 wandb/
 scripts/copy_results.sh
+logs/
 
 # Keep placeholder files
 !results/**/.gitkeep

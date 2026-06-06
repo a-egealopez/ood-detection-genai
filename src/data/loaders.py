@@ -15,6 +15,8 @@ class DataLoaderSpec:
     ood_name: str
     input_dim: int
     is_image: bool
+    img_mean: np.ndarray | None = None
+    img_std: np.ndarray | None = None
 
 
 def _to_tensor_dataset(
@@ -229,8 +231,9 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     test_ds  = PathMNIST(split="test",  download=True, root=root)
 
     def to_chw_flat(imgs: np.ndarray) -> np.ndarray:
-        # (N, H, W, C) uint8 -> (N, C*H*W) float32 in [0, 1] — no normalization yet
-        return imgs.astype(np.float32).transpose(0, 3, 1, 2).reshape(-1, 3 * 28 * 28) / 255.0
+        # (N, H, W, C) uint8 -> (N, C*H*W) float32 in [-1, 1]
+        # Same convention as MNIST (Normalize(0.5, 0.5)) so clip_sample_range=1.0 is valid
+        return imgs.astype(np.float32).transpose(0, 3, 1, 2).reshape(-1, 3 * 28 * 28) / 127.5 - 1.0
 
     x_train_all = to_chw_flat(train_ds.imgs)
     y_train_all = train_ds.labels.squeeze()
@@ -248,10 +251,12 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     if len(x_train) == 0 or len(x_id) == 0 or len(x_ood) == 0:
         raise ValueError("PathMNIST class filtering produced an empty split.")
 
-    # Normalization statistics from training data only (same pattern as sicap)
-    mean = x_train.mean(axis=0, keepdims=True)
-    std  = x_train.std(axis=0,  keepdims=True)
-    std  = np.where(std < 1e-6, 1.0, std)
+    # Data already in [-1, 1] — no further normalization needed
+    _mean = np.zeros((1, 3 * 28 * 28), dtype=np.float32)
+    _std  = np.ones((1, 3 * 28 * 28), dtype=np.float32)
+    # Denorm for visualization: (img + 1) / 2, equivalent to img * 0.5 + 0.5
+    _denorm_mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+    _denorm_std  = np.array([0.5, 0.5, 0.5], dtype=np.float32)
 
     def first_n(x, y, n):
         if n is None:
@@ -266,15 +271,17 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     id_tag  = "+".join(str(c) for c in id_classes)
     ood_tag = "+".join(str(c) for c in ood_classes)
     datasets = {
-        "train":    _to_tensor_dataset(x_train, y_train, mean, std),
-        "id_eval":  _to_tensor_dataset(x_id,    y_id,    mean, std),
-        "ood_eval": _to_tensor_dataset(x_ood,   y_ood,   mean, std),
+        "train":    _to_tensor_dataset(x_train, y_train, _mean, _std),
+        "id_eval":  _to_tensor_dataset(x_id,    y_id,    _mean, _std),
+        "ood_eval": _to_tensor_dataset(x_ood,   y_ood,   _mean, _std),
     }
     return datasets, DataLoaderSpec(
         id_name=f"PathMNIST-ID{id_tag}",
         ood_name=f"PathMNIST-OOD{ood_tag}",
         input_dim=3 * 28 * 28,
         is_image=True,
+        img_mean=_denorm_mean,
+        img_std=_denorm_std,
     )
 
 
@@ -302,6 +309,9 @@ def build_dataloaders(cfg: DictConfig) -> dict:
     cfg.data.id_name = meta.id_name
     cfg.data.ood_name = meta.ood_name
     cfg.data.is_image = meta.is_image
+    if meta.img_mean is not None:
+        cfg.data.img_mean = meta.img_mean.tolist()
+        cfg.data.img_std = meta.img_std.tolist()
 
     loader_kwargs = {
         "batch_size": int(cfg.training.batch_size),

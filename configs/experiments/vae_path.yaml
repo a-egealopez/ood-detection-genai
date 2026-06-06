@@ -2,17 +2,21 @@ experiment_name: vae_path
 
 model:
   model_type: vae
-  latent_dim: 64
-  hidden_dim: 512
-  depth: 3
+  latent_dim: 256
+  hidden_dim: 1024
+  depth: 5
 
 training:
-  epochs: 150
+  epochs: 200
   lr: 1.0e-4
+  optimizer: adamw
+  weight_decay: 1.0e-5
   scheduler: cosine
   warmup_epochs: 25
   kl_weight: 1.0e-3
-  kl_warmup_epochs: 30
+  kl_warmup_epochs: 50
+  early_stopping: true
+  early_stopping_patience: 25
 
 ood:
   primary_score: elbo
