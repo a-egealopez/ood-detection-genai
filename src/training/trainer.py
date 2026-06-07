@@ -1,3 +1,4 @@
+import sys
 import warnings
 from pathlib import Path
 
@@ -108,10 +109,8 @@ def _training_snapshot(
     run,
 ) -> None:
     fig = model.snapshot_fig(loaders, cfg, device, epoch, epochs)
-    # persist the snapshot to disk and (optionally) W&B instead of showing
-    try:
-        from pathlib import Path
 
+    try:
         from src.artifacts import save_figure
 
         plots_dir = Path(cfg.viz.get("train_plots_dir", "results/training/plots/"))
@@ -139,7 +138,7 @@ def _print_training_header(model: torch.nn.Module, cfg: DictConfig) -> None:
     print(f"{'=' * 52}")
     print(f"  epochs        : {t.epochs}")
     print(f"  lr            : {t.lr}")
-    print(f"  optimizer     : {t.get('optimizer', 'adam')}")
+    print(f"  optimizer     : {t.get('optimizer', 'adamw')}")
     print(f"  scheduler     : {t.get('scheduler', 'none')}")
 
     grad_clip = float(t.get("grad_clip", 0.0))
@@ -159,6 +158,50 @@ def _print_training_header(model: torch.nn.Module, cfg: DictConfig) -> None:
         val = f"{v:,}" if isinstance(v, int) else v
         print(f"  {label}: {val}")
     print(f"{'=' * 52}\n")
+
+
+_PRINT_SKIP_KEYS = {"recon"}
+
+
+def _update_pbar(
+    pbar,
+    epoch_losses: dict,
+    val_loss: float | None,
+    lr: float,
+    avg_gnorm: float | None,
+    kl_weight: float,
+) -> None:
+    postfix = {k: f"{v:.4f}" for k, v in epoch_losses.items() if k not in _PRINT_SKIP_KEYS}
+    if kl_weight > 0:
+        postfix["kl_w"] = f"{kl_weight:.2e}"
+    if val_loss is not None:
+        postfix["val"] = f"{val_loss:.4f}"
+    postfix["lr"] = f"{lr:.2e}"
+    if avg_gnorm is not None:
+        postfix["gnorm"] = f"{avg_gnorm:.3f}"
+    pbar.set_postfix(postfix)
+    pbar.close()
+
+
+def _print_epoch_log(
+    model_type: str,
+    epoch: int,
+    epochs: int,
+    epoch_losses: dict,
+    val_loss: float | None,
+    lr: float,
+    avg_gnorm: float | None,
+    kl_weight: float,
+) -> None:
+    parts = [f"{k}={v:.4f}" for k, v in epoch_losses.items() if k not in _PRINT_SKIP_KEYS]
+    if kl_weight > 0:
+        parts.append(f"kl_w={kl_weight:.2e}")
+    if val_loss is not None:
+        parts.append(f"val={val_loss:.4f}")
+    parts.append(f"lr={lr:.2e}")
+    if avg_gnorm is not None:
+        parts.append(f"gnorm={avg_gnorm:.3f}")
+    print(f"[{model_type.upper()}] Epoch {epoch:03d}/{epochs}  " + "  ".join(parts), flush=True)
 
 
 def train_model(
@@ -197,12 +240,12 @@ def train_model(
     )
 
     _print_training_header(model, cfg)
-    # apply paper style (uses cfg when available)
     try:
         apply_paper_style(cfg)
     except Exception:
         pass
     history: list[dict] = []
+    _interactive = sys.stdin.isatty()
 
     for epoch in range(1, epochs + 1):
         kl_weight = model.kl_weight_at(epoch, cfg)
@@ -210,15 +253,17 @@ def train_model(
         model.train()
         totals: dict[str, float] = {}
         n = 0
-
+        grad_norm_total = 0.0
+        train_loader = loaders["train"]
         pbar = tqdm(
-            loaders["train"],
+            total=len(train_loader),
             desc=f"[{model_type.upper()}] Epoch {epoch:03d}/{epochs}",
             unit="batch",
             leave=True,
+            disable=not _interactive,
         )
 
-        for x, _ in pbar:
+        for x, _ in train_loader:
             x = x.to(device)
             optimizer.zero_grad()
 
@@ -226,7 +271,8 @@ def train_model(
             next(iter(L.values())).backward()
 
             if grad_clip > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                gn = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                grad_norm_total += gn.item()
             optimizer.step()
             if ema is not None:
                 ema.update(model)
@@ -234,20 +280,23 @@ def train_model(
             for k, v in L.items():
                 totals[k] = totals.get(k, 0.0) + v.item()
             n += 1
+            pbar.update(1)
 
-            postfix = {k: f"{totals[k] / n:.4f}" for k in totals}
-            if kl_weight > 0:
-                postfix["kl_w"] = f"{kl_weight:.2e}"
-            pbar.set_postfix(postfix)
+            if _interactive:
+                postfix = {k: f"{totals[k] / n:.4f}" for k in totals if k not in _PRINT_SKIP_KEYS}
+                if kl_weight > 0:
+                    postfix["kl_w"] = f"{kl_weight:.2e}"
+                pbar.set_postfix(postfix)
 
         epoch_losses = {k: v / n for k, v in totals.items()}
+        current_lr = optimizer.param_groups[0]["lr"]
+        avg_gnorm = grad_norm_total / n if grad_clip > 0 else None
         history.append(epoch_losses)
 
         wandb_payload = {f"train/loss_{k}": v for k, v in epoch_losses.items()}
-        wandb_payload["epoch"] = epoch
         wandb_payload["train/kl_weight"] = kl_weight
-        wandb_payload["train/lr"] = optimizer.param_groups[0]["lr"]
-        run.log(wandb_payload)
+        wandb_payload["train/lr"] = current_lr
+        run.log(wandb_payload, step=epoch)
 
         if scheduler is not None:
             with warnings.catch_warnings():
@@ -256,13 +305,21 @@ def train_model(
                 )
                 scheduler.step()
 
+        val_loss = None
         if epoch % val_every == 0:
             val_loss = _validation_loss(model, loaders["id_eval"], device, kl_weight, ema=ema)
-            run.log({"val/loss_total": val_loss, "epoch": epoch})
+            run.log({"val/loss_total": val_loss}, step=epoch)
 
             if stopper is not None and stopper.step(val_loss):
+                _update_pbar(pbar, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
+                if not _interactive:
+                    _print_epoch_log(model_type, epoch, epochs, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
                 print(f"Early stopping at epoch {epoch} (best val={stopper.best_val:.6f})")
                 break
+
+        _update_pbar(pbar, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
+        if not _interactive:
+            _print_epoch_log(model_type, epoch, epochs, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
 
         if viz_enabled and (epoch % viz_every == 0 or epoch == 1):
             _training_snapshot(model, loaders, cfg, device, epoch, epochs, run)

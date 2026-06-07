@@ -65,7 +65,7 @@ log_time() {
         $((elapsed/3600)) $(( (elapsed/60)%60 )) $((elapsed%60))
 }
 
-run_python() { python3 main.py "$@" 2>&1 | sed 's/^/  /'; }
+run_python() { python3 main.py "$@" 2>&1 | stdbuf -oL sed 's/^/  /'; }
 
 run_timed() {
     local label=$1; shift

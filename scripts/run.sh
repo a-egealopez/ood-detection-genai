@@ -7,19 +7,10 @@
 
 ## for i in {0..4}; do nohup bash scripts/run.sh "$i" > "logs/log_$i.txt" 2>&1 & sleep 1; done; wait; nohup bash scripts/run.sh 5 > "logs/log_5.txt" 2>&1; SUMMARIZE=1 nohup bash scripts/run.sh > "logs/log_summary.txt" 2>&1 &
 ## pkill -u alejegealopez python3
+## WANDB_MODE=disabled
 
 set -euo pipefail
 DIR="$(dirname "$0")"
-
-# En contextos no-interactivos (nohup) ~/.bashrc no se ejecuta.
-# Leemos WANDB_API_KEY desde ~/.netrc para que wandb funcione en background.
-if [[ -z "${WANDB_API_KEY:-}" ]]; then
-    _wandb_key=$(python3 -c \
-        "import netrc, sys; a=netrc.netrc().authenticators('api.wandb.ai'); print(a[2] if a else '')" \
-        2>/dev/null || true)
-    [[ -n "${_wandb_key:-}" ]] && export WANDB_API_KEY="$_wandb_key"
-    unset _wandb_key
-fi
 
 source "$DIR/core.sh"
 source "$DIR/experiments.sh"

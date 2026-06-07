@@ -5,7 +5,7 @@ model:
   hidden_dim: 2048
   depth: 5
   time_emb_dim: 512
-  dropout: 0.0
+  dropout: 0.1
   num_train_timesteps: 1000
   beta_start: 0.0001
   beta_end: 0.02
@@ -18,14 +18,14 @@ model:
 training:
   lr: 1.0e-3
   epochs: 400
-  batch_size: 128
+  batch_size: 256
   optimizer: adamw
   weight_decay: 1.0e-5
   scheduler: cosine
   warmup_epochs: 30
   use_ema: true
   early_stopping: true
-  early_stopping_patience: 100
+  early_stopping_patience: 50
 
 ood:
   primary_score: noise_single

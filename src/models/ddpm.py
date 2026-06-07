@@ -1,5 +1,3 @@
-import math
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -14,75 +12,89 @@ from .base_model import BaseOODModel
 from .ood_scorers import DEFAULT_KNN_K, build_latent_reference, compute_ood_score
 
 
-class SinusoidalPosEmb(nn.Module):
-    def __init__(self, dim: int) -> None:
+class SinusoidalEmbedding(nn.Module):
+    def __init__(self, size: int, scale: float = 1.0) -> None:
         super().__init__()
-        self.dim = dim
+        self.scale = scale
+        half = size // 2
+        emb = torch.log(torch.tensor(10000.0)) / max(half - 1, 1)
+        emb = torch.exp(-emb * torch.arange(half))
+        self.register_buffer("emb", emb)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        half = self.dim // 2
-        scale = math.log(10000) / max(half - 1, 1)
-        freq = torch.exp(torch.arange(half, device=x.device) * -scale)
-        emb = x[:, None] * freq[None, :]
-        return torch.cat([emb.sin(), emb.cos()], dim=-1)
+        e = (x * self.scale) * self.emb.unsqueeze(0)
+        return torch.cat([e.sin(), e.cos()], dim=-1)
 
 
-class ResidualMLPBlock(nn.Module):
-    def __init__(self, hidden_dim: int, time_emb_dim: int, dropout: float = 0.0) -> None:
+class ResidualBlock(nn.Module):
+    def __init__(self, size: int, t_dim: int, dropout: float = 0.0) -> None:
         super().__init__()
-        self.norm = nn.LayerNorm(hidden_dim)
-        self.ff = nn.Linear(hidden_dim, hidden_dim)
-        self.time_proj = nn.Linear(time_emb_dim, hidden_dim)
+        self.norm = nn.LayerNorm(size)
+        self.ff = nn.Linear(size + t_dim, size)
         self.act = nn.GELU()
         self.drop = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
     def forward(self, x: torch.Tensor, t_emb: torch.Tensor) -> torch.Tensor:
-        h = self.act(self.ff(self.norm(x)) + self.time_proj(t_emb))
-        return x + self.drop(h)
+        h = torch.cat([self.norm(x), t_emb], dim=-1)
+        return x + self.drop(self.act(self.ff(h)))
 
 
-class ResidualMLPDenoiser(nn.Module):
+class ResidualMLP(nn.Module):
     def __init__(
         self,
         input_dim: int,
         hidden_dim: int,
         depth: int,
-        time_emb_dim: int = 256,
+        time_emb_dim: int = 128,
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        self.time_mlp = nn.Sequential(
-            SinusoidalPosEmb(time_emb_dim),
-            nn.Linear(time_emb_dim, time_emb_dim * 2),
-            nn.GELU(),
-            nn.Linear(time_emb_dim * 2, time_emb_dim),
-        )
-        self.in_proj = nn.Linear(input_dim, hidden_dim)
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self._use_fourier = input_dim <= 4
+
+        self.time_emb = SinusoidalEmbedding(time_emb_dim)
+
+        if self._use_fourier:
+            self.input_embs = nn.ModuleList(
+                [SinusoidalEmbedding(time_emb_dim, scale=25.0) for _ in range(input_dim)]
+            )
+            concat_size = input_dim * time_emb_dim + time_emb_dim
+        else:
+            concat_size = input_dim + time_emb_dim
+
+        self.in_proj = nn.Sequential(nn.Linear(concat_size, hidden_dim), nn.GELU())
         self.blocks = nn.ModuleList(
-            [
-                ResidualMLPBlock(hidden_dim, time_emb_dim, dropout=dropout)
-                for _ in range(max(depth, 1))
-            ]
+            [ResidualBlock(hidden_dim, time_emb_dim, dropout=dropout) for _ in range(max(depth, 1))]
         )
         self.out_norm = nn.LayerNorm(hidden_dim)
         self.out_proj = nn.Linear(hidden_dim, input_dim)
-        self.act = nn.GELU()
+
         self.apply(self._init_weights)
 
     @staticmethod
-    def _init_weights(module: nn.Module) -> None:
-        if isinstance(module, nn.Linear):
-            nn.init.xavier_uniform_(module.weight)
-            if module.bias is not None:
-                nn.init.zeros_(module.bias)
+    def _init_weights(m: nn.Module) -> None:
+        if isinstance(m, nn.Linear):
+            nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         b = x.shape[0]
         x_flat = x.reshape(b, -1)
-        t_emb = self.time_mlp(t.float())
-        h = self.act(self.in_proj(x_flat))
-        for blk in self.blocks:
-            h = blk(h, t_emb)
+        t_emb = self.time_emb(t.float().reshape(-1, 1))
+
+        if self._use_fourier:
+            x_enc = torch.cat(
+                [self.input_embs[i](x_flat[:, i:i+1]) for i in range(self.input_dim)],
+                dim=-1,
+            )
+        else:
+            x_enc = x_flat
+
+        h = self.in_proj(torch.cat([x_enc, t_emb], dim=-1))
+        for block in self.blocks:
+            h = block(h, t_emb)
         return self.out_proj(self.out_norm(h)).view_as(x)
 
 
@@ -119,7 +131,7 @@ class DDPMModel(nn.Module, BaseOODModel):
 
         self.ood_reference: dict | None = None
 
-        self.model = ResidualMLPDenoiser(
+        self.model = ResidualMLP(
             input_dim=input_dim,
             hidden_dim=hidden_dim,
             depth=depth,
@@ -144,7 +156,7 @@ class DDPMModel(nn.Module, BaseOODModel):
             return (x_noisy - (1 - ab).sqrt() * pred) / ab.sqrt()
         if self.prediction_type == "v_prediction":
             return ab.sqrt() * x_noisy - (1 - ab).sqrt() * pred
-        return pred  # prediction_type == "sample"
+        return pred
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         b = x.shape[0]
@@ -166,7 +178,7 @@ class DDPMModel(nn.Module, BaseOODModel):
             target = x
 
         pred = self.model(x_noisy, t)
-        return {"noise_mse": self._recon_fn(pred, target).mean()}
+        return {"eps_mse": self._recon_fn(pred, target).mean()}
 
     @torch.no_grad()
     def reconstruct_at_t(
@@ -177,10 +189,10 @@ class DDPMModel(nn.Module, BaseOODModel):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if noise is None:
             noise = torch.randn_like(x)
+        t_scalar = int(t.max().item())
         x_noisy = self.scheduler.add_noise(x, noise, t)
-        pred = self.model(x_noisy, t)
-        x_recon = self._tweedie(x_noisy, pred, t)
-        return x_recon, x_noisy, pred
+        states = self.denoise_trajectory(x, t_start=t_scalar, capture_timesteps=[0], noise=noise)
+        return states[0], x_noisy, noise
 
     @torch.no_grad()
     def denoise_trajectory(
@@ -323,7 +335,7 @@ class DDPMModel(nn.Module, BaseOODModel):
     def training_info(self) -> dict:
         n_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         return {
-            "hidden_dim": self.model.in_proj.out_features,
+            "hidden_dim": self.model.hidden_dim,
             "timesteps": self.num_train_timesteps,
             "prediction": self.prediction_type,
             "recon_t": self.recon_timestep,
@@ -424,13 +436,10 @@ class DDPMModel(nn.Module, BaseOODModel):
             for t_step in score_timesteps:
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
-                x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
-                self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
                 mse_score = self._noise_pred_error(x, t_batch, fixed_noise)
                 z_scores.append(
                     (mse_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
                 )
-            # INVERTIMOS porque COSINE es medida de SIMILITUD no de DISTANCIA
             return torch.stack(z_scores, dim=1).mean(dim=1).cpu().numpy()
 
         if mode == "noise_multi_cosine":
@@ -441,8 +450,6 @@ class DDPMModel(nn.Module, BaseOODModel):
             for t_step in score_timesteps:
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=x.device, dtype=torch.long)
-                x_noisy = self.scheduler.add_noise(x, fixed_noise, t_batch)
-                # x_recon = self._tweedie(x_noisy, self.model(x_noisy, t_batch), t_batch)
                 cosine_score = self._noise_pred_cosine(x, t_batch, fixed_noise)
                 z_scores.append(
                     (cosine_score - per_level_stats[t_key]["mean"]) / per_level_stats[t_key]["std"]
@@ -493,7 +500,6 @@ class DDPMModel(nn.Module, BaseOODModel):
             for t_step in score_timesteps:
                 t_key = int(t_step.item())
                 t_batch = torch.full((b,), t_key, device=device, dtype=torch.long)
-                self.scheduler.add_noise(x, fixed_noise, t_batch)
                 noise_err = self._noise_pred_error(x, t_batch, fixed_noise)
                 cosine_err = self._noise_pred_cosine(x, t_batch, fixed_noise)
                 mse_stats_per_t[t_key].extend(noise_err.cpu().tolist())

@@ -9,6 +9,7 @@ from src.evaluation.plot import plot_embeddings
 from .base_model import BaseOODModel
 from .ood_scorers import DEFAULT_KNN_K, build_latent_reference, compute_ood_score
 
+
 def _build_encoder_body(input_dim: int, hidden_dim: int, depth: int) -> nn.Sequential:
     layers = []
     prev = input_dim
@@ -81,7 +82,7 @@ class VAEModel(nn.Module, BaseOODModel):
         beta = float(self.kl_weight if kl_weight is None else kl_weight)
         recon = self._recon_fn(x_recon, self._flatten(x)).mean()
         kl = -0.5 * torch.mean(1 + z_logvar - z_mu.pow(2) - z_logvar.exp())
-        return {"total": recon + beta * kl, "recon": recon, "kl": kl}
+        return {"elbo": recon + beta * kl, "recon": recon, "kl": kl}
 
     def compute_loss(self, x: torch.Tensor, kl_weight: float = 0.0) -> dict[str, torch.Tensor]:
         x_recon, z_mu, z_logvar = self.forward(x)

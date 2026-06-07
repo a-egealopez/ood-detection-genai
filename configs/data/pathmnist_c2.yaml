@@ -1,5 +1,5 @@
-# In-distribution:     PathMNIST classes 0,3,4,5,6 (multi-class scenario)
-# Out-of-distribution: classes 7 (Empty) and 8 (Stroma/Tumour)
+# In-distribution:     PathMNIST classes 0,3,4,5,6 (multi-class scenario without 1-2/background-debris)
+# Out-of-distribution: classes 7 (Stroma) and 8 (Tumour)
 
 data:
   dataset: pathmnist_c2

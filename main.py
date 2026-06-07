@@ -148,14 +148,13 @@ def _mode_reconstruction_method(args):
         cfg.seed = args.seed
 
     cfg.method = "reconstruction-method"
-    train_experiment_id = build_experiment_id(cfg)  # base, sin _t — T no afecta al modelo
+    train_experiment_id = build_experiment_id(cfg)
     cfg.training.checkpoint_dir = f"results/training/{train_experiment_id}/checkpoints"
     cfg.viz.train_plots_dir = f"results/training/{train_experiment_id}/plots"
 
     if args.n_score_steps is not None and str(cfg.model.get("model_type", "")) == "ddpm":
         cfg.model.n_score_steps = args.n_score_steps
 
-    # Para DDPM el ID de eval incluye _t para distinguir runs del ablation
     if "ddpm" in str(cfg.model.get("model_type", "")):
         eval_experiment_id = f"{train_experiment_id}_t{int(cfg.model.get('n_score_steps', 10))}"
     else:

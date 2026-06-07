@@ -298,7 +298,6 @@ def _build_toy_recon_fig(ctx: StageContext, metadata: DatasetMetadata) -> plt.Fi
     id_np, ood_np = to_np(x_id), to_np(x_ood)
     recon_id_np, recon_ood_np = to_np(x_recon_id), to_np(x_recon_ood)
 
-    ctx.cfg.model.model_type.upper()
     fig, axes = plt.subplots(1, 2, figsize=(ctx.cfg.viz.textwidth_in, style.FIG_H1))
     fig.suptitle(
         f"Input vs. reconstructed — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW
@@ -349,7 +348,6 @@ def _build_reconstruction_fig_vae(
         x_recon_ood, _, _ = ctx.model(x_ood)
 
     is_image = bool(ctx.cfg.data.get("is_image", False))
-    ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
     denorm_fn = _make_denorm(ctx.cfg)
 
@@ -422,8 +420,12 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
         noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
 
         with torch.no_grad():
-            x_recon_id,  x_noisy_id,  _ = ctx.model.reconstruct_at_t(x_id,  t_values, noise=noise_id)
-            x_recon_ood, x_noisy_ood, _ = ctx.model.reconstruct_at_t(x_ood, t_values, noise=noise_ood)
+            _id_pairs  = [ctx.model.reconstruct_at_t(x_id[i:i+1],  t_values[i:i+1], noise=noise_id[i:i+1])  for i in range(len(keyframes))]
+            _ood_pairs = [ctx.model.reconstruct_at_t(x_ood[i:i+1], t_values[i:i+1], noise=noise_ood[i:i+1]) for i in range(len(keyframes))]
+            x_recon_id  = torch.stack([p[0][0] for p in _id_pairs])
+            x_noisy_id  = torch.stack([p[1][0] for p in _id_pairs])
+            x_recon_ood = torch.stack([p[0][0] for p in _ood_pairs])
+            x_noisy_ood = torch.stack([p[1][0] for p in _ood_pairs])
             x_iter_id = torch.stack([
                 ctx.model.denoise_trajectory(
                     x_id[i : i + 1], t_start=int(t_values[i].item()),
@@ -445,14 +447,14 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
             f"Diffusion timesteps — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW
         )
         rows_spec = [
-            (f"{metadata.id_name} Original",    x_id,        "steelblue", None),
-            (f"{metadata.id_name} Noisy (x_t)", x_noisy_id,  "steelblue", t_values),
-            (f"{metadata.id_name} Tweedie",      x_recon_id,  "steelblue", t_values),
-            (f"{metadata.id_name} Iterative",    x_iter_id,   "steelblue", t_values),
-            (f"{metadata.ood_name} Original",    x_ood,       "tomato",    None),
-            (f"{metadata.ood_name} Noisy (x_t)", x_noisy_ood, "tomato",    t_values),
-            (f"{metadata.ood_name} Tweedie",      x_recon_ood, "tomato",    t_values),
-            (f"{metadata.ood_name} Iterative",    x_iter_ood,  "tomato",    t_values),
+            ("ID\nOriginal",    x_id,        "steelblue", None),
+            ("ID\nNoisy (x_t)", x_noisy_id,  "steelblue", t_values),
+            ("ID\nIterative",    x_recon_id,  "steelblue", t_values),
+            ("ID\nIterative",    x_iter_id,   "steelblue", t_values),
+            ("OOD\nOriginal",    x_ood,       "tomato",    None),
+            ("OOD\nNoisy (x_t)", x_noisy_ood, "tomato",    t_values),
+            ("OOD\nIterative",   x_recon_ood, "tomato",    t_values),
+            ("OOD\nIterative",   x_iter_ood,  "tomato",    t_values),
         ]
         for row, (title, batch, color, t_vals) in enumerate(rows_spec):
             axes[row, 0].set_ylabel(title, fontsize=9, fontweight="bold", color=color)
@@ -532,13 +534,8 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
     ctx.model.eval()
 
     dataset_config_name = str(ctx.cfg.data.get("dataset", "")).lower()
-    if "pathmnist" in dataset_config_name:
-        pass  # problemas por falta de embedding
-    else:
-        int(ctx.model.num_train_timesteps * 0.25)  # 1000 * 0.25 = 250
     mode = str(ctx.cfg.viz.get("ddpm_denoising_trajectory_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
-    ctx.cfg.model.model_type.upper()
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
     denorm_fn = _make_denorm(ctx.cfg)
 
@@ -650,8 +647,8 @@ def _show_save_log(
 def _collect_raw_vectors(loader):
     vecs, labs = [], []
     for x, y in loader:
-        vecs.append(x.view(x.size(0), -1).numpy())
-        labs.append(y.numpy())
+        vecs.append(x.view(x.size(0), -1).cpu().numpy())
+        labs.append(y.cpu().numpy())
     return np.concatenate(vecs), np.concatenate(labs)
 
 
@@ -683,7 +680,6 @@ def _plot_embedding_panel(
     recon_labs,
     embed_label,
 ) -> None:
-    ctx.cfg.model.model_type.upper()
     cmap = plt.colormaps["tab10"].resampled(10)
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
     fig, axs = plt.subplots(3, 1, figsize=(textwidth, style.FIG_H3), squeeze=False)
