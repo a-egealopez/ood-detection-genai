@@ -151,7 +151,6 @@ class MlpDDPMModel(BaseDDPMModel):
 
         n_rows = 2 if is_image else 3
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.2 * n_cols, n_rows * 2.5))
-        fig.suptitle(f"MlpDDPM Snapshot — epoch {epoch}/{epochs}", fontsize=12, fontweight="bold")
 
         with torch.no_grad():
             for i in range(n_cols):
@@ -193,7 +192,6 @@ class MlpDDPMModel(BaseDDPMModel):
         recon = x_recon.cpu().numpy()
 
         fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-        fig.suptitle(f"MlpDDPM Snapshot (2D) — epoch {epoch}/{epochs}", fontsize=12, fontweight="bold")
         kw = dict(s=10, alpha=0.65)
         axes[0].scatter(orig[:, 0], orig[:, 1], c="steelblue", **kw)
         axes[0].set_title("Original ID")

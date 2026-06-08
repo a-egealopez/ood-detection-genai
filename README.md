@@ -44,7 +44,7 @@ Python 3.10 · PyTorch 2.0+ · see `environment.yml` for the full dependency lis
 │   ├── data/                      # Dataset loaders
 │   ├── training/                  # Training loop, EMA, early stopping
 │   ├── evaluation/                # Metrics, score extraction, plots
-│   ├── benchmarking/              # Summary tables and ablation plots
+│   ├── benchmarking/              # Summary tables, ablation plots, training times
 │   ├── artifacts.py               # W&B logging and file persistence
 │   ├── config.py                  # Config building and seeding
 │   ├── stages.py                  # Pipeline stages (train, eval, visualise)
@@ -77,8 +77,8 @@ python main.py \
   --skip-train
 ```
 
-Supported experiments: `vae`, `ddpm`, `vae_toy`, `ddpm_toy`, `vae_path`, `ddpm_path`.  
-Supported datasets: `mnist`, `sicap_c1`, `sicap_c12`, `pathmnist`, `moons`, `blobs`.
+Supported experiments: `mlp/vae/sicap`, `mlp/ddpm/sicap`, `mlp/vae/path`, `mlp/ddpm/path`, `mlp/ddpm/mnist`, `mlp/vae/toy`, `mlp/ddpm/toy`, `unet/vae/base`, `unet/ddpm/base`.  
+Supported datasets: `mnist`, `sicap_c1`, `sicap_c12`, `pathmnist_c1`, `pathmnist_c2`, `moons`, `blobs`.
 
 ### Distance-based baselines
 
@@ -100,7 +100,7 @@ python main.py \
   --out-csv  results/summary/comparison.csv
 ```
 
-Reads all `eval_results.json` files under `--logs-dir`, writes a CSV, and generates LaTeX tables and ablation plots under `results/summary/`.
+Reads all `eval_results.json` files under `--logs-dir`, writes a CSV, and generates LaTeX tables (comparison, ablation, training times) and ablation plots under `results/summary/`.
 
 ---
 
@@ -129,11 +129,12 @@ SUMMARIZE=1 bash scripts/run.sh
 | Group | Content | Purpose |
 |-------|---------|---------|
 | `exp_0` | KNN + Mahalanobis baselines on SICAP | Distance-based reference, no training required |
-| `exp_1` | VAE + DDPM on toy datasets (moons, blobs) | Sanity check on controlled 2D data |
-| `exp_2` | VAE + DDPM on MNIST | Benchmark on standard image data (MNIST vs SVHN) |
-| `exp_3` | VAE + DDPM on PathMNIST | Benchmark on histopathology images (normal vs tumour) |
-| `exp_4` | VAE + DDPM on SICAP (multi-seed, multi-LR) | Main evaluation, results averaged across seeds |
-| `exp_5` | DDPM scoring-step ablation (T ∈ {5, 10, 25, 50}) | Sensitivity of noise-based scores to number of steps |
+| `exp_1` | MLP VAE + DDPM on toy datasets (moons, blobs) | Sanity check on controlled 2D data |
+| `exp_2` | MLP VAE + DDPM on MNIST and PathMNIST-C1 | Benchmark on standard and histopathology images |
+| `exp_3` | UNet VAE + DDPM on MNIST | Convolutional backbone on standard image data |
+| `exp_4` | UNet VAE + DDPM on PathMNIST (C1, C2) | Convolutional backbone on histopathology images |
+| `exp_5` | MLP VAE + DDPM on SICAP (multi-seed, multi-LR) | Main evaluation, results averaged across seeds |
+| `exp_6` | DDPM T-step ablation on SICAP and PathMNIST | Sensitivity of noise-based scores to number of steps |
 
 Override defaults with environment variables:
 
@@ -161,6 +162,8 @@ SEEDS="42 107 2024" LRS_VAE="1e-4 5e-4" MODEL=vae bash scripts/run.sh 4
 | `noise_single` | MSE between predicted and actual noise at a fixed timestep |
 | `noise_multi_mse` | Z-scored MSE aggregated over multiple timesteps |
 | `noise_multi_cosine` | Z-scored cosine distance aggregated over multiple timesteps |
+| `recon_single` | Reconstruction error after single-step denoising |
+| `recon_multi` | Reconstruction error averaged over multiple denoising steps |
 | `residual_mah` | Mahalanobis distance in the noise-residual space |
 | `residual_knn` | KNN distance in the noise-residual space |
 

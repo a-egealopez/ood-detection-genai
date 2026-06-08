@@ -10,6 +10,7 @@ training:
   epochs: 80
   lr: 1.0e-3
   scheduler: cosine
+  batch_size: 16
   warmup_epochs: 10
   kl_weight: 0.01
   kl_warmup_epochs: 20

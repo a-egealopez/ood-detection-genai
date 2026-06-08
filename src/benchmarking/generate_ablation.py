@@ -133,12 +133,6 @@ def _plot_ablation_group(
     fig, axes = plt.subplots(
         1, len(datasets), figsize=(textwidth * len(datasets), textwidth * 0.55), squeeze=False
     )
-    fig.suptitle(
-        f"DDPM — AUROC vs. scoring steps (T) [{group_title}]",
-        fontsize=9,
-        fontweight="normal",
-        y=0.97,
-    )
 
     for ax, dataset in zip(axes[0], datasets, strict=True):
         subset = abl[abl["dataset"] == dataset]

@@ -79,7 +79,6 @@ class UnetVAEModel(BaseVAEModel):
             x_recon, _, _ = self.autoencoder(x_batch)
 
         fig, axes = plt.subplots(2, n_cols, figsize=(2.2 * n_cols, 5))
-        fig.suptitle(f"UnetVAE Snapshot — epoch {epoch}/{epochs}", fontsize=12, fontweight="bold")
         is_image = True
         for i in range(n_cols):
             axes[0, i].set_title(f"#{i + 1} cls={labels[i].item()}", fontsize=7)

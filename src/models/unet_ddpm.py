@@ -71,7 +71,6 @@ class UnetDDPMModel(BaseDDPMModel):
         )
 
         fig, axes = plt.subplots(3, n_cols, figsize=(2.2 * n_cols, 7))
-        fig.suptitle(f"UnetDDPM Snapshot — epoch {epoch}/{epochs}", fontsize=12, fontweight="bold")
 
         with torch.no_grad():
             for i in range(n_cols):

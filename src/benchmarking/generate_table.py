@@ -328,7 +328,6 @@ def _plot_methods_comparison(
         ax.set_title(dataset.upper(), fontsize=12, fontweight="bold")
         ax.grid(True, alpha=0.2, axis="y")
 
-    fig.suptitle(f"AUROC por método — {group_title}", fontsize=9, fontweight="normal", y=0.97)
     plt.tight_layout(rect=[0, 0, 1, 0.92])
     save_figure(
         fig,

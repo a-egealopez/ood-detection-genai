@@ -21,13 +21,8 @@ from src.artifacts import save_figure
 if TYPE_CHECKING:
     from src.evaluation.extract import ScoreBundle
 
-_SUPTITLE_KW = dict(fontsize=9, fontweight="normal", y=0.97)
-_SUPTITLE_RECT = [0, 0, 1, 0.92]
-
-
 def _apply_suptitle(fig: plt.Figure, title: str, rect_bottom: float = 0.0) -> None:
-    fig.suptitle(title, fontsize=8, fontweight="normal", y=0.98)
-    fig.tight_layout(rect=[0, rect_bottom, 1, 0.94])
+    fig.tight_layout()
 
 
 def render_cell(
@@ -151,7 +146,6 @@ def plot_ood_evaluation(
             fig, axes = plt.subplots(1, 2, figsize=(textwidth, style.FIG_H1))
 
             pretty_name = labels_map.get(mode, mode) if labels_map else mode
-            fig.suptitle(pretty_name, **_SUPTITLE_KW)
 
             _plot_score_distribution(
                 getattr(scores, id_attr),
@@ -169,7 +163,7 @@ def plot_ood_evaluation(
                 axes[1],
             )
 
-            plt.tight_layout(rect=_SUPTITLE_RECT)
+            plt.tight_layout()
             mode_name = mode
             if plots_dir is not None:
                 save_figure(
@@ -312,7 +306,6 @@ def plot_embeddings(
     fig, axes = plt.subplots(1, len(projectors), figsize=(width, style.FIG_H1))
     if len(projectors) == 1:
         axes = [axes]
-    fig.suptitle(title, **_SUPTITLE_KW)
 
     for ax, name in zip(axes, projectors, strict=False):
         _scatter_panel(
@@ -323,7 +316,7 @@ def plot_embeddings(
             label_map,
             ood_label,
         )
-    plt.tight_layout(rect=_SUPTITLE_RECT)
+    plt.tight_layout()
 
     if save_name:
         save_figure(

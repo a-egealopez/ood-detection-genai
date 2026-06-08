@@ -5,7 +5,7 @@ import torch
 
 from src import stages as stg
 from src.artifacts import build_experiment_id, build_wandb_run
-from src.benchmarking import run_aggregate_tables, run_feature_distance, run_summary, run_t_ablation
+from src.benchmarking import run_aggregate_tables, run_feature_distance, run_summary, run_t_ablation, run_training_times
 from src.config import build_config, seed_everything
 from src.data import build_dataloaders
 from src.models import MODEL_REGISTRY
@@ -96,6 +96,7 @@ def _mode_stats_summary(args):
     out_dir = str(Path(out_csv).parent)
     run_aggregate_tables(csv_path=out_csv, out_dir=out_dir)
     run_t_ablation(csv_path=out_csv, out_dir=out_dir)
+    run_training_times(out_dir=out_dir)
 
 
 def _mode_distance_method(args):
