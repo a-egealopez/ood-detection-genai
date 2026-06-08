@@ -1,0 +1,5 @@
+experiment_name: distance_sicap
+
+ood:
+  knn_k: 5
+  mahalanobis_reg: 1.0e-5

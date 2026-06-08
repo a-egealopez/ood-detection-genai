@@ -56,11 +56,7 @@ def _parse_args():
     p.add_argument("--seed", type=int)
     p.add_argument("--config", type=str, default="configs/base.yaml")
 
-    p.add_argument(
-        "--experiment",
-        choices=["vae", "ddpm", "ddpm_mnist", "ddpm_sicap", "vae_toy", "ddpm_toy", "vae_path", "ddpm_path"],
-        default="vae",
-    )
+    p.add_argument("--experiment", type=str, default="mlp/vae/sicap")
     p.add_argument("--lr", type=float)
     p.add_argument("--epochs", type=int)
     p.add_argument("--skip-train", action="store_true")
@@ -84,12 +80,8 @@ def _parse_args():
         p.error("--skip-train/--skip-eval not applicable in distance-method mode")
     if args.mode == "stats-summary" and (args.skip_train or args.skip_eval or args.out != ""):
         p.error("--skip-train/--skip-eval/--out not applicable in stats-summary mode")
-    if args.n_score_steps is not None and (
-        args.mode != "reconstruction-method" or "ddpm" not in args.experiment
-    ):
-        p.error(
-            "--n-score-steps is only valid with --mode reconstruction-method and a ddpm experiment"
-        )
+    if args.n_score_steps is not None and args.mode != "reconstruction-method":
+        p.error("--n-score-steps is only valid with --mode reconstruction-method")
 
     return args
 
@@ -152,7 +144,7 @@ def _mode_reconstruction_method(args):
     cfg.training.checkpoint_dir = f"results/training/{train_experiment_id}/checkpoints"
     cfg.viz.train_plots_dir = f"results/training/{train_experiment_id}/plots"
 
-    if args.n_score_steps is not None and str(cfg.model.get("model_type", "")) == "ddpm":
+    if args.n_score_steps is not None and "ddpm" in str(cfg.model.get("model_type", "")):
         cfg.model.n_score_steps = args.n_score_steps
 
     if "ddpm" in str(cfg.model.get("model_type", "")):
@@ -198,7 +190,8 @@ def _mode_reconstruction_method(args):
 
         if not args.skip_eval:
             cfg.viz.plots_dir = str(cfg.viz.eval_plots_dir)
-            viz_key = "toy" if cfg.data.dataset in _TOY_DATASETS else cfg.model.model_type
+            mt = str(cfg.model.model_type)
+            viz_key = "toy" if cfg.data.dataset in _TOY_DATASETS else ("vae" if "vae" in mt else "ddpm")
             if visualize := RECON_VISUALIZERS.get(viz_key):
                 visualize(ctx)
             results = stg.stage_evaluation(ctx)

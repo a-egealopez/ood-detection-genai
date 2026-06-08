@@ -1,36 +1,35 @@
-experiment_name: ddpm_mnist
+experiment_name: mlp_ddpm_toy
 
 model:
-  model_type: ddpm
-  hidden_dim: 2048
-  depth: 5
-  time_emb_dim: 512
+  model_type: mlp_ddpm
+  hidden_dim: 64
+  depth: 2
+  time_emb_dim: 64
   dropout: 0.1
   num_train_timesteps: 1000
   beta_start: 0.0001
   beta_end: 0.02
   prediction_type: epsilon
-  clip_sample: true
+  clip_sample: false
   n_score_steps: 10
-  recon_timestep: 100
-  noise_timestep: 100
+  recon_timestep: 150
+  noise_timestep: 150
 
 training:
   lr: 1.0e-3
-  epochs: 400
-  batch_size: 256
+  epochs: 100
+  batch_size: 16
   optimizer: adamw
-  weight_decay: 1.0e-5
   scheduler: cosine
-  warmup_epochs: 30
+  warmup_epochs: 10
   use_ema: true
   early_stopping: true
-  early_stopping_patience: 50
+  early_stopping_patience: 30
 
 ood:
   primary_score: noise_single
   knn_k: 1
 
 wandb:
-  tags: [ood, ddpm, mnist]
+  tags: [ood, mlp_ddpm, toy]
   save_code: false

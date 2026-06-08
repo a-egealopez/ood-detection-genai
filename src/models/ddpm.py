@@ -266,7 +266,7 @@ class DDPMModel(nn.Module, BaseOODModel):
         axes[0].set_aspect("equal")
         axes[0].grid(True, alpha=0.3)
         axes[1].scatter(recon[:, 0], recon[:, 1], c="darkorange", **kw)
-        axes[1].set_title(f"Tweedie recon (t={self.noise_timestep})")
+        axes[1].set_title(f"Iterative recon (t={self.noise_timestep})")
         axes[1].set_aspect("equal")
         axes[1].grid(True, alpha=0.3)
         plt.tight_layout()
@@ -366,7 +366,6 @@ class DDPMModel(nn.Module, BaseOODModel):
         else:
             alphas_bar = self.scheduler.alphas_cumprod.to(x.device)
             ab = alphas_bar[t].view(-1, *([1] * (x.dim() - 1)))
-            x_noisy = self.scheduler.add_noise(x, noise, t)
             return (x_noisy - ab.sqrt() * pred) / (1 - ab).sqrt().clamp(min=1e-8)
 
     def _noise_pred_error(self, x, t, noise):
@@ -483,7 +482,7 @@ class DDPMModel(nn.Module, BaseOODModel):
         mse_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
         cosine_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
         recon_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
-        _MAX_RECON_REF = 512  # cap iterative recon reference (expensive: t denoising steps/sample)
+        _MAX_RECON_REF = 512  # cap iterative recon reference for avoid gpu explosion on large datasets
         n_recon_seen = 0
 
         self.eval()

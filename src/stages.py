@@ -241,7 +241,7 @@ def stage_evaluation(ctx: StageContext):
         )
         plt.close(fig)
 
-    if str(ctx.cfg.model.model_type) == "vae":
+    if "vae" in str(ctx.cfg.model.model_type):
         raw_vecs, raw_labs, recon_vecs, recon_labs = _collect_recon_vectors(ctx)
         _plot_embedding_panel(
             ctx, raw_vecs, raw_labs, embeddings_id, labels_id, recon_vecs, recon_labs, embed_label
@@ -426,35 +426,19 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
             x_noisy_id  = torch.stack([p[1][0] for p in _id_pairs])
             x_recon_ood = torch.stack([p[0][0] for p in _ood_pairs])
             x_noisy_ood = torch.stack([p[1][0] for p in _ood_pairs])
-            x_iter_id = torch.stack([
-                ctx.model.denoise_trajectory(
-                    x_id[i : i + 1], t_start=int(t_values[i].item()),
-                    capture_timesteps=[0], noise=noise_id[i : i + 1], from_noise=False,
-                )[0][0]
-                for i in range(len(keyframes))
-            ])
-            x_iter_ood = torch.stack([
-                ctx.model.denoise_trajectory(
-                    x_ood[i : i + 1], t_start=int(t_values[i].item()),
-                    capture_timesteps=[0], noise=noise_ood[i : i + 1], from_noise=False,
-                )[0][0]
-                for i in range(len(keyframes))
-            ])
 
         n_cols = len(keyframes) + 1
-        fig, axes = plt.subplots(8, n_cols, figsize=(2.0 * n_cols, 1.8 * 8))
+        fig, axes = plt.subplots(6, n_cols, figsize=(2.0 * n_cols, 1.8 * 6))
         fig.suptitle(
             f"Diffusion timesteps — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW
         )
         rows_spec = [
             ("ID\nOriginal",    x_id,        "steelblue", None),
             ("ID\nNoisy (x_t)", x_noisy_id,  "steelblue", t_values),
-            ("ID\nIterative",    x_recon_id,  "steelblue", t_values),
-            ("ID\nIterative",    x_iter_id,   "steelblue", t_values),
-            ("OOD\nOriginal",    x_ood,       "tomato",    None),
-            ("OOD\nNoisy (x_t)", x_noisy_ood, "tomato",    t_values),
-            ("OOD\nIterative",   x_recon_ood, "tomato",    t_values),
-            ("OOD\nIterative",   x_iter_ood,  "tomato",    t_values),
+            ("ID\nIterative",   x_recon_id,  "steelblue", t_values),
+            ("OOD\nOriginal",   x_ood,       "tomato",    None),
+            ("OOD\nNoisy (x_t)",x_noisy_ood, "tomato",    t_values),
+            ("OOD\nIterative",  x_recon_ood, "tomato",    t_values),
         ]
         for row, (title, batch, color, t_vals) in enumerate(rows_spec):
             axes[row, 0].set_ylabel(title, fontsize=9, fontweight="bold", color=color)
@@ -484,47 +468,31 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
     noise_id  = ctx.model._fixed_noise(x_id.shape, ctx.device)
     noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
 
-    x_tweedie_id,  x_iter_id  = [], []
-    x_tweedie_ood, x_iter_ood = [], []
+    x_recon_id,  x_recon_ood = [], []
 
     with torch.no_grad():
         for t in compact_steps:
             t_tensor = torch.tensor([t], device=ctx.device, dtype=torch.long)
             rec_id,  _, _ = ctx.model.reconstruct_at_t(x_id,  t_tensor, noise=noise_id)
             rec_ood, _, _ = ctx.model.reconstruct_at_t(x_ood, t_tensor, noise=noise_ood)
-            x_tweedie_id.append(rec_id[0].cpu())
-            x_tweedie_ood.append(rec_ood[0].cpu())
-            x_iter_id.append(
-                ctx.model.denoise_trajectory(
-                    x_id,  t_start=t, capture_timesteps=[0], noise=noise_id,  from_noise=False,
-                )[0][0].cpu()
-            )
-            x_iter_ood.append(
-                ctx.model.denoise_trajectory(
-                    x_ood, t_start=t, capture_timesteps=[0], noise=noise_ood, from_noise=False,
-                )[0][0].cpu()
-            )
+            x_recon_id.append(rec_id[0].cpu())
+            x_recon_ood.append(rec_ood[0].cpu())
 
     n_cols = len(compact_steps) + 1
-    fig, axes = plt.subplots(4, n_cols, figsize=(textwidth, style.FIG_H2), squeeze=False)
+    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth, style.FIG_H2), squeeze=False)
     fig.suptitle(f"Diffusion timesteps — {metadata.id_name} · {metadata.ood_name}", **_SUPTITLE_KW)
 
     for col_i, t in enumerate(compact_steps):
         axes[0, col_i + 1].set_title(f"t={t}", fontsize=8)
 
-    for row_base, (x_orig, tw_list, it_list, color, tag) in enumerate([
-        (x_id,  x_tweedie_id,  x_iter_id,  "steelblue", "ID"),
-        (x_ood, x_tweedie_ood, x_iter_ood, "tomato",    "OOD"),
+    for row, (x_orig, recon_list, color, tag) in enumerate([
+        (x_id,  x_recon_id,  "steelblue", "ID"),
+        (x_ood, x_recon_ood, "tomato",    "OOD"),
     ]):
-        r_tw = row_base * 2
-        r_it = row_base * 2 + 1
-        render_cell(axes[r_tw, 0], x_orig[0].cpu(), is_image, color, denorm_fn)
-        axes[r_tw, 0].set_ylabel(f"{tag}\nTweedie",   fontsize=9, fontweight="bold", color=color)
-        render_cell(axes[r_it, 0], x_orig[0].cpu(), is_image, color, denorm_fn)
-        axes[r_it, 0].set_ylabel(f"{tag}\nIterative", fontsize=9, fontweight="bold", color=color)
+        render_cell(axes[row, 0], x_orig[0].cpu(), is_image, color, denorm_fn)
+        axes[row, 0].set_ylabel(f"{tag}\nIterative", fontsize=9, fontweight="bold", color=color)
         for idx in range(len(compact_steps)):
-            render_cell(axes[r_tw, idx + 1], tw_list[idx], is_image, color, denorm_fn)
-            render_cell(axes[r_it, idx + 1], it_list[idx], is_image, color, denorm_fn)
+            render_cell(axes[row, idx + 1], recon_list[idx], is_image, color, denorm_fn)
 
     plt.tight_layout(rect=_SUPTITLE_RECT)
     return fig
@@ -533,7 +501,6 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
 def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadata) -> plt.Figure:
     ctx.model.eval()
 
-    dataset_config_name = str(ctx.cfg.data.get("dataset", "")).lower()
     mode = str(ctx.cfg.viz.get("ddpm_denoising_trajectory_mode", "compact")).lower()
     is_image = bool(ctx.cfg.data.get("is_image", False))
     textwidth = float(ctx.cfg.viz.get("textwidth_in", 6.0))
@@ -611,7 +578,7 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
 
 def _ddpm_keyframes(max_t: int, n: int = 7) -> list[int]:
     T = max_t + 1
-    return [min(int(round(T * i / (n - 1))), max_t) for i in range(n)]
+    return [max(1, min(int(round(T * i / (n - 1))), max_t)) for i in range(n)]
 
 
 def _show_save_log(

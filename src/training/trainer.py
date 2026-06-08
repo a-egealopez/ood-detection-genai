@@ -308,7 +308,7 @@ def train_model(
         val_loss = None
         if epoch % val_every == 0:
             val_loss = _validation_loss(model, loaders["id_eval"], device, kl_weight, ema=ema)
-            run.log({"val/loss_total": val_loss}, step=epoch)
+            run.log({"val/loss": val_loss}, step=epoch)
 
             if stopper is not None and stopper.step(val_loss):
                 _update_pbar(pbar, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)

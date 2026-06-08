@@ -1,10 +1,10 @@
-experiment_name: ddpm_sicap
+experiment_name: mlp_ddpm_path
 
 model:
-  model_type: ddpm
-  hidden_dim: 1024
-  depth: 5
-  time_emb_dim: 256
+  model_type: mlp_ddpm
+  hidden_dim: 2048
+  depth: 6
+  time_emb_dim: 512
   dropout: 0.1
   num_train_timesteps: 1000
   beta_start: 0.0001
@@ -17,8 +17,8 @@ model:
 
 training:
   lr: 1.0e-4
-  epochs: 700
-  batch_size: 512
+  epochs: 500
+  batch_size: 128
   optimizer: adamw
   weight_decay: 1.0e-5
   scheduler: cosine
@@ -32,5 +32,5 @@ ood:
   knn_k: 1
 
 wandb:
-  tags: [ood, ddpm, sicap]
+  tags: [ood, mlp_ddpm, pathmnist]
   save_code: false

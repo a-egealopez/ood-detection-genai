@@ -1,0 +1,36 @@
+experiment_name: mlp_ddpm_sicap
+
+model:
+  model_type: mlp_ddpm
+  hidden_dim: 1024
+  depth: 5
+  time_emb_dim: 256
+  dropout: 0.1
+  num_train_timesteps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  prediction_type: epsilon
+  clip_sample: true
+  n_score_steps: 10
+  recon_timestep: 200
+  noise_timestep: 200
+
+training:
+  lr: 1.0e-4
+  epochs: 700
+  batch_size: 512
+  optimizer: adamw
+  weight_decay: 1.0e-5
+  scheduler: cosine
+  warmup_epochs: 30
+  use_ema: true
+  early_stopping: true
+  early_stopping_patience: 100
+
+ood:
+  primary_score: noise_single
+  knn_k: 1
+
+wandb:
+  tags: [ood, mlp_ddpm, sicap]
+  save_code: false

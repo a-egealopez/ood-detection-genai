@@ -36,20 +36,21 @@ def _build_mnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     n_train = cfg.data.get("n_train_samples", None)
     n_eval = cfg.data.get("n_eval_samples", None)
     root = cfg.data.root
+    flat_mode = bool(cfg.data.get("flat", True))
 
     norm = transforms.Normalize((0.5,), (0.5,))
-    flat = transforms.Lambda(lambda x: x.view(-1))
+    flat_tf = transforms.Lambda(lambda x: x.view(-1))
 
-    id_tf = transforms.Compose([transforms.ToTensor(), norm, flat])
-    ood_tf = transforms.Compose(
-        [
-            transforms.Grayscale(1),
-            transforms.Resize((28, 28)),
-            transforms.ToTensor(),
-            norm,
-            flat,
-        ]
-    )
+    if flat_mode:
+        id_tf = transforms.Compose([transforms.ToTensor(), norm, flat_tf])
+        ood_tf = transforms.Compose(
+            [transforms.Grayscale(1), transforms.Resize((28, 28)), transforms.ToTensor(), norm, flat_tf]
+        )
+    else:
+        id_tf = transforms.Compose([transforms.ToTensor(), norm])
+        ood_tf = transforms.Compose(
+            [transforms.Grayscale(1), transforms.Resize((28, 28)), transforms.ToTensor(), norm]
+        )
 
     id_train = torchvision.datasets.MNIST(root=root, train=True, download=True, transform=id_tf)
     id_test = torchvision.datasets.MNIST(root=root, train=False, download=True, transform=id_tf)
@@ -218,8 +219,8 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     root = str(cfg.data.get("root", "data/"))
     n_train = cfg.data.get("n_train_samples", None)
     n_eval = cfg.data.get("n_eval_samples", None)
+    flat_mode = bool(cfg.data.get("flat", True))
 
-    # Support both new-style id_classes/ood_classes lists and legacy norm_label/tum_label
     if cfg.data.get("id_classes") is not None:
         id_classes = list(cfg.data.id_classes)
         ood_classes = list(cfg.data.ood_classes)
@@ -230,14 +231,12 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     train_ds = PathMNIST(split="train", download=True, root=root)
     test_ds  = PathMNIST(split="test",  download=True, root=root)
 
-    def to_chw_flat(imgs: np.ndarray) -> np.ndarray:
-        # (N, H, W, C) uint8 -> (N, C*H*W) float32 in [-1, 1]
-        # Same convention as MNIST (Normalize(0.5, 0.5)) so clip_sample_range=1.0 is valid
-        return imgs.astype(np.float32).transpose(0, 3, 1, 2).reshape(-1, 3 * 28 * 28) / 127.5 - 1.0
+    def to_chw(imgs: np.ndarray) -> np.ndarray:
+        return imgs.astype(np.float32).transpose(0, 3, 1, 2) / 127.5 - 1.0
 
-    x_train_all = to_chw_flat(train_ds.imgs)
+    x_train_all = to_chw(train_ds.imgs)
     y_train_all = train_ds.labels.squeeze()
-    x_test_all  = to_chw_flat(test_ds.imgs)
+    x_test_all  = to_chw(test_ds.imgs)
     y_test_all  = test_ds.labels.squeeze()
 
     train_mask = np.isin(y_train_all, id_classes)
@@ -251,10 +250,13 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     if len(x_train) == 0 or len(x_id) == 0 or len(x_ood) == 0:
         raise ValueError("PathMNIST class filtering produced an empty split.")
 
-    # Data already in [-1, 1] — no further normalization needed
-    _mean = np.zeros((1, 3 * 28 * 28), dtype=np.float32)
-    _std  = np.ones((1, 3 * 28 * 28), dtype=np.float32)
-    # Denorm for visualization: (img + 1) / 2, equivalent to img * 0.5 + 0.5
+    if flat_mode:
+        x_train = x_train.reshape(len(x_train), -1)
+        x_id    = x_id.reshape(len(x_id), -1)
+        x_ood   = x_ood.reshape(len(x_ood), -1)
+
+    _mean = np.zeros((1,) + x_train.shape[1:], dtype=np.float32)
+    _std  = np.ones((1,) + x_train.shape[1:], dtype=np.float32)
     _denorm_mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
     _denorm_std  = np.array([0.5, 0.5, 0.5], dtype=np.float32)
 

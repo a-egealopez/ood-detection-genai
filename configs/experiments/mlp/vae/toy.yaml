@@ -1,7 +1,7 @@
-experiment_name: vae_toy
+experiment_name: mlp_vae_toy
 
 model:
-  model_type: vae
+  model_type: mlp_vae
   latent_dim: 2
   hidden_dim: 32
   depth: 1
@@ -19,5 +19,5 @@ ood:
   knn_k: 5
 
 wandb:
-  tags: [ood, vae, toy]
+  tags: [ood, mlp_vae, toy]
   save_code: false

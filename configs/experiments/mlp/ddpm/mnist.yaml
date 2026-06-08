@@ -1,9 +1,9 @@
-experiment_name: ddpm_path
+experiment_name: mlp_ddpm_mnist
 
 model:
-  model_type: ddpm
+  model_type: mlp_ddpm
   hidden_dim: 2048
-  depth: 6
+  depth: 5
   time_emb_dim: 512
   dropout: 0.1
   num_train_timesteps: 1000
@@ -12,25 +12,25 @@ model:
   prediction_type: epsilon
   clip_sample: true
   n_score_steps: 10
-  recon_timestep: 200
-  noise_timestep: 200
+  recon_timestep: 100
+  noise_timestep: 100
 
 training:
-  lr: 1.0e-4
-  epochs: 500
-  batch_size: 128
+  lr: 1.0e-3
+  epochs: 400
+  batch_size: 256
   optimizer: adamw
   weight_decay: 1.0e-5
   scheduler: cosine
   warmup_epochs: 30
   use_ema: true
   early_stopping: true
-  early_stopping_patience: 100
+  early_stopping_patience: 50
 
 ood:
   primary_score: noise_single
   knn_k: 1
 
 wandb:
-  tags: [ood, ddpm, pathmnist]
+  tags: [ood, mlp_ddpm, mnist]
   save_code: false

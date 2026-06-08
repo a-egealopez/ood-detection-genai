@@ -8,6 +8,11 @@
 ## for i in {0..4}; do nohup bash scripts/run.sh "$i" > "logs/log_$i.txt" 2>&1 & sleep 1; done; wait; nohup bash scripts/run.sh 5 > "logs/log_5.txt" 2>&1; SUMMARIZE=1 nohup bash scripts/run.sh > "logs/log_summary.txt" 2>&1 &
 ## pkill -u alejegealopez python3
 ## WANDB_MODE=disabled
+## NOHUP DA PROBLEMAS CON WANDB --> MEJOR USAR COMANDO SCREEN:
+####screen -S nombre_sesion
+####screen -list
+####Ctrl + A + D <-SALIR
+####screen -r nombre_sesion
 
 set -euo pipefail
 DIR="$(dirname "$0")"

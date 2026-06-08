@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
-# ── Dataset groups ────────────────────────────────────────────────────────────
 TOY_DATASETS="${TOY_DATASETS:-moons blobs}"
 SICAP_DATASETS="${SICAP_DATASETS:-sicap_c1 sicap_c12}"
 PATH_DATASETS="${PATH_DATASETS:-pathmnist_c1 pathmnist_c2}"
 
-# ── Single-run seeds / LRs (toy, mnist) ───────────────────────────────────────
 SEED="${SEED:-42}"
 
 SEED_TOY="${SEED_TOY:-42}"
@@ -13,10 +11,9 @@ LR_VAE_TOY="${LR_VAE_TOY:-1e-3}"
 LR_DDPM_TOY="${LR_DDPM_TOY:-1e-3}"
 
 SEED_MNIST="${SEED_MNIST:-42}"
-LR_VAE_MNIST="${LR_VAE_MNIST:-1e-4}"
-LR_DDPM_MNIST="${LR_DDPM_MNIST:-1e-4}"
+LR_MLP_MNIST="${LR_MLP_MNIST:-1e-4}"
+LR_MLP_PATH="${LR_MLP_PATH:-1e-4}"
 
-# ── Multi-seed / multi-LR for key experiments (sicap + pathmnist) ─────────────
 SEEDS="${SEEDS:-42 107 2024}"
 LRS_VAE="${LRS_VAE:-1e-4 5e-4 1e-3}"
 LRS_DDPM="${LRS_DDPM:-1e-4 5e-4 1e-3}"
@@ -25,7 +22,9 @@ SEEDS_PATH="${SEEDS_PATH:-42 107 2024}"
 LRS_VAE_PATH="${LRS_VAE_PATH:-1e-4 5e-4 1e-3}"
 LRS_DDPM_PATH="${LRS_DDPM_PATH:-1e-4 5e-4 1e-3}"
 
-# ── T-ablation best configs ───────────────────────────────────────────────────
+SEEDS_UNET="${SEEDS_UNET:-42 107 2024}"
+LRS_UNET="${LRS_UNET:-1e-4 5e-4}"
+
 T_VALUES="${T_VALUES:-5 10 25 50}"
 
 BEST_SEED="${BEST_SEED:-42}"
@@ -34,11 +33,9 @@ BEST_LR_DDPM="${BEST_LR_DDPM:-1e-3}"
 BEST_SEED_PATH="${BEST_SEED_PATH:-42}"
 BEST_LR_DDPM_PATH="${BEST_LR_DDPM_PATH:-1e-3}"
 
-# ── Output paths ──────────────────────────────────────────────────────────────
 LOGS_DIR="${LOGS_DIR:-results/evaluation}"
 OUT_CSV="${OUT_CSV:-results/summary/comparison.csv}"
 
-# ── Utilities ─────────────────────────────────────────────────────────────────
 MODEL=${MODEL:-both}
 should_run() {
     local target_model=$1
@@ -74,7 +71,6 @@ run_timed() {
     log_time "$label" "$t0" "$(date +%s)"
 }
 
-# run_loop SKIP_FLAG EXPERIMENT DATASET SEEDS_STR LRS_STR
 run_loop() {
     local skip_flag=$1 exp=$2 dataset=$3 seeds=$4 lrs=$5
     for seed in $seeds; do
