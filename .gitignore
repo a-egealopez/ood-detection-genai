@@ -35,6 +35,7 @@ logs/
 figures/
 tables/
 latex_chapters/
+.claude/
 
 # Keep placeholder files
 !results/**/.gitkeep
