@@ -36,10 +36,6 @@ Python 3.10 · PyTorch 2.0+ · see `environment.yml` for the full dependency lis
 │   ├── data/                      # Per-dataset configs (mnist, sicap_c1, sicap_c12, …)
 │   └── experiments/               # Per-model configs (mlp/vae, mlp/ddpm, unet/*, …)
 ├── data/                          # Raw datasets (MNIST, PathMNIST, SICAP)
-├── figures/                       # Figures copied for the thesis (via copy_results.sh)
-├── tables/                        # LaTeX tables copied for the thesis (via copy_results.sh)
-├── latex_chapters/                # Thesis chapter sources (capitulo3, capitulo4, apendice)
-├── logs/                          # Per-run timing logs (log_0.txt … log_N.txt)
 ├── scripts/
 │   ├── core.sh                    # Shared helpers and loop primitives
 │   ├── experiments.sh             # Numbered experiment functions (exp_0 … exp_6)

@@ -33,6 +33,7 @@ wandb/
 scripts/copy_results.sh
 logs/
 figures/
+tables/
 latex_chapters/
 
 # Keep placeholder files
