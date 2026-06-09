@@ -228,8 +228,9 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
         id_classes = [int(cfg.data.get("norm_label", 6))]
         ood_classes = [int(cfg.data.get("tum_label", 8))]
 
-    train_ds = PathMNIST(split="train", download=True, root=root)
-    test_ds  = PathMNIST(split="test",  download=True, root=root)
+    size = int(cfg.data.get("img_size", 28))
+    train_ds = PathMNIST(split="train", download=True, root=root, size=size)
+    test_ds  = PathMNIST(split="test",  download=True, root=root, size=size)
 
     def to_chw(imgs: np.ndarray) -> np.ndarray:
         return imgs.astype(np.float32).transpose(0, 3, 1, 2) / 127.5 - 1.0
@@ -280,7 +281,7 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     return datasets, DataLoaderSpec(
         id_name=f"PathMNIST-ID{id_tag}",
         ood_name=f"PathMNIST-OOD{ood_tag}",
-        input_dim=3 * 28 * 28,
+        input_dim=3 * size * size,
         is_image=True,
         img_mean=_denorm_mean,
         img_std=_denorm_std,

@@ -8,9 +8,6 @@ from src.evaluation.plot import render_cell
 
 from .base_ddpm import BaseDDPMModel
 
-_IMG_SIZE = 28
-
-
 class UnetDDPMModel(BaseDDPMModel):
     def __init__(
         self,
@@ -104,7 +101,9 @@ class UnetDDPMModel(BaseDDPMModel):
 
 def build_unet_ddpm_model(cfg: DictConfig, device: torch.device) -> UnetDDPMModel:
     m = cfg.model
-    in_channels = int(cfg.data.input_dim) // (_IMG_SIZE * _IMG_SIZE)
+    # data config takes priority (e.g. 224 for pathmnist), falls back to model config or 28
+    img_size = int(cfg.data.get("img_size", m.get("img_size", 28)))
+    in_channels = int(cfg.data.input_dim) // (img_size * img_size)
     channels = tuple(int(c) for c in m.get("channels", [64, 128, 256]))
     attention_levels = tuple(bool(a) for a in m.get("attention_levels", [False, True, True]))
     num_head_channels = tuple(int(h) for h in m.get("num_head_channels", [0, 64, 128]))

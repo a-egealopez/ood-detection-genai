@@ -98,24 +98,29 @@ def _parse_t_from_id(experiment_id: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _write_tab_results_tex(agg: pd.DataFrame, datasets: list[str], out: Path, suffix: str) -> None:
+def _write_tab_results_tex(
+    agg: pd.DataFrame, datasets: list[str], out: Path, suffix: str,
+    caption: str = "", label: str = "",
+) -> None:
     groups = {"Baselines": ["knn", "mahalanobis"], "VAE": ["vae"], "DDPM": ["ddpm"]}
 
     n_cols = 6
+    cap_line = rf"    \caption{{{caption}}} \label{{{label}}} \\" if caption else ""
     lines = [
         r"\begin{longtable}{llllll}",
+        *(([cap_line]) if cap_line else []),
+        r"    \toprule",
+        r"    Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
+        r"    \midrule",
+        r"    \endfirsthead",
+        r"    ",
         r"    \toprule",
         r"    Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"    \midrule",
         r"    \endhead",
         r"    ",
-        r"    \toprule",
-        r"    Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
         r"    \midrule",
-        r"    \endlisthead",
-        r"    ",
-        r"    \midrule",
-        r"    \multicolumn{6}{r}{\textit{Continúa en la página siguiente}} \\",
+        r"    \multicolumn{6}{r}{\textit{Continúa en la siguiente página}} \\",
         r"    \endfoot",
         r"    ",
         r"    \bottomrule",
@@ -123,7 +128,8 @@ def _write_tab_results_tex(agg: pd.DataFrame, datasets: list[str], out: Path, su
     ]
 
     for dataset in datasets:
-        lines.append(rf"    \multicolumn{{{n_cols}}}{{l}}{{\textbf{{{dataset.upper()}}}}} \\")
+        ds_display = dataset.upper().replace("_", r"\_")
+        lines.append(rf"    \multicolumn{{{n_cols}}}{{l}}{{\textbf{{{ds_display}}}}} \\")
         lines.append(r"    \midrule")
 
         sub = agg[agg["dataset"] == dataset]
@@ -383,7 +389,15 @@ def run_aggregate_tables(
         )
         agg.columns = ["_".join(c).rstrip("_") for c in agg.columns]
 
-        _write_tab_results_tex(agg, key_datasets, out, suffix=group_name)
+        ds_label = group_name.upper()
+        _write_tab_results_tex(
+            agg, key_datasets, out, suffix=group_name,
+            caption=(
+                f"Resultados completos en {ds_label}: AUROC, AUPR y FPR@95\\%"
+                r" (media~$\pm$~desv.\ típica). Mejor AUROC por grupo en negrita."
+            ),
+            label=f"tab:results_{group_name}_full",
+        )
 
         dist = df[df["method"].isin(DISTANCE_METHODS) & df["dataset"].isin(key_datasets)].copy()
         _write_tab_comparison_tex(agg, dist, key_datasets, out, suffix=group_name)

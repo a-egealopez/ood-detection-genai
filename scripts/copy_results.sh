@@ -120,6 +120,7 @@ for f in \
     "table_comparison_sicap.tex" \
     "table_ablation_t_sicap.tex" \
     "table_results_sicap.tex" \
+    "table_results_pathmnist.tex" \
     "table_training_times.tex"; do
     src="$ROOT/$SUM/$f"
     if [[ -f "$src" ]]; then

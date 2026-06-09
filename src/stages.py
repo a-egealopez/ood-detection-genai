@@ -531,7 +531,7 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         return fig
 
     # ── compact ──────────────────────────────────────────────────────────────
-    capture_timesteps = [t_gen, int(t_gen * 0.75), int(t_gen * 0.50), int(t_gen * 0.25), 0]
+    capture_timesteps = [t_gen, 750, 500, 250, 150, 100, 50, 25, 15, 10]
     x_shape = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
 
     trajs = []
@@ -545,17 +545,18 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
             )
         )
 
-    fig, axes = plt.subplots(2, len(capture_timesteps), figsize=(textwidth, style.FIG_H1), squeeze=False)
+    n_cols = len(capture_timesteps)
+    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth * n_cols / 5, style.FIG_H1), squeeze=False)
 
     for row, traj in enumerate(trajs):
         axes[row, 0].set_ylabel(f"Run {row + 1}", fontsize=9, fontweight="bold")
         for c, t in enumerate(capture_timesteps):
             if t == t_gen:
-                token = "z ~ N(0,I)"
-            elif t == 0:
-                token = "x̂₀"
+                token = "z"
+            elif c == n_cols - 1:
+                token = r"$\hat{x}_0$"
             else:
-                token = f"x_t  (t={t})"
+                token = f"t={t}"
             render_cell(axes[row, c], traj[int(t)][0].cpu(), is_image, "steelblue", denorm_fn)
             axes[row, c].set_title(token, fontsize=8)
 

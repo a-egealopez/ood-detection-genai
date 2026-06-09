@@ -11,6 +11,7 @@ data:
   flat: false
 
 training:
+  batch_size: 32
   epochs: 150
   lr: 1.0e-4
   optimizer: adamw

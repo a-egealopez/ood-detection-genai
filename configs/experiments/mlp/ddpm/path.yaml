@@ -1,5 +1,8 @@
 experiment_name: mlp_ddpm_path
 
+data:
+  img_size: 28  # override pathmnist default (224) — MLP works on flat 28x28
+
 model:
   model_type: mlp_ddpm
   hidden_dim: 2048

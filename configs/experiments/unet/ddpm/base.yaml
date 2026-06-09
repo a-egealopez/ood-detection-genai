@@ -4,8 +4,8 @@ model:
   model_type: unet_ddpm
   img_size: 28
   channels: [64, 128, 256]
-  attention_levels: [false, true, true]
-  num_head_channels: [0, 64, 128]
+  attention_levels: [false, false, false]
+  num_head_channels: [0, 0, 64]
   num_res_blocks: 1
   num_train_timesteps: 1000
   beta_start: 0.0001
@@ -20,6 +20,7 @@ data:
   flat: false
 
 training:
+  batch_size: 16
   epochs: 300
   lr: 1.0e-4
   optimizer: adamw

@@ -182,6 +182,8 @@ def plot_ood_evaluation(
 
 
 def _standardize_scale(zs: np.ndarray) -> np.ndarray:
+    if zs.ndim > 2:
+        zs = zs.reshape(zs.shape[0], -1)
     return StandardScaler().fit_transform(zs)
 
 
