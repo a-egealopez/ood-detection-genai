@@ -3,7 +3,6 @@ from abc import abstractmethod
 import numpy as np
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig
 
 from .base_model import BaseOODModel
 from .ood_scorers import DEFAULT_KNN_K, build_latent_reference, compute_ood_score

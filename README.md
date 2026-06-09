@@ -34,11 +34,17 @@ Python 3.10 · PyTorch 2.0+ · see `environment.yml` for the full dependency lis
 ├── configs/
 │   ├── base.yaml                  # Shared defaults
 │   ├── data/                      # Per-dataset configs (mnist, sicap_c1, sicap_c12, …)
-│   └── experiments/               # Per-model configs (vae, ddpm, *_toy, *_path)
+│   └── experiments/               # Per-model configs (mlp/vae, mlp/ddpm, unet/*, …)
+├── data/                          # Raw datasets (MNIST, PathMNIST, SICAP)
+├── figures/                       # Figures copied for the thesis (via copy_results.sh)
+├── tables/                        # LaTeX tables copied for the thesis (via copy_results.sh)
+├── latex_chapters/                # Thesis chapter sources (capitulo3, capitulo4, apendice)
+├── logs/                          # Per-run timing logs (log_0.txt … log_N.txt)
 ├── scripts/
 │   ├── core.sh                    # Shared helpers and loop primitives
-│   ├── experiments.sh             # Numbered experiment functions (exp_0 … exp_5)
-│   └── run.sh                     # Entry point for multi-GPU runs
+│   ├── experiments.sh             # Numbered experiment functions (exp_0 … exp_6)
+│   ├── run.sh                     # Entry point for multi-GPU runs
+│   └── copy_results.sh            # Copies figures and tables to figures/ and tables/
 ├── src/
 │   ├── models/                    # VAE, DDPM, OOD scorers, base interface
 │   ├── data/                      # Dataset loaders
@@ -108,16 +114,24 @@ Reads all `eval_results.json` files under `--logs-dir`, writes a CSV, and genera
 
 The numbered experiment functions in `scripts/experiments.sh` reproduce the full study.
 
+Experiments exp_3 and exp_4 (UNet on MNIST/PathMNIST) each take 20–40 h of GPU time.
+Use `screen` so runs survive SSH disconnections:
+
 ```bash
 # Run a single experiment group (e.g. toy datasets)
 bash scripts/run.sh 1
 
-# Run multiple groups on a specific GPU
-CUDA_VISIBLE_DEVICES=0 bash scripts/run.sh 1 2
+# Typical 2-GPU split used in the thesis — run inside screen sessions
+screen -S exp3
+CUDA_VISIBLE_DEVICES=0 bash scripts/run.sh 3
+# Ctrl+A D  to detach
 
-# Typical 2-GPU split used in the thesis
-CUDA_VISIBLE_DEVICES=0 nohup bash scripts/run.sh 1 2 > gpu0.log 2>&1 &
-CUDA_VISIBLE_DEVICES=1 nohup bash scripts/run.sh 3 4 5 > gpu1.log 2>&1 &
+screen -S exp4
+CUDA_VISIBLE_DEVICES=1 bash scripts/run.sh 4
+# Ctrl+A D  to detach
+
+# Re-attach later
+screen -r exp3
 
 # Distance baselines (CPU, lightweight)
 bash scripts/run.sh 0
