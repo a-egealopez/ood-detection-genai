@@ -37,7 +37,10 @@ def render_cell(
         if arr.size == 784:
             ax.imshow(arr.reshape(28, 28), cmap="gray", vmin=-1, vmax=1)
         else:
-            img = arr.reshape(3, 28, 28).transpose(1, 2, 0).astype(np.float32)
+            spatial_size = int((arr.size / 3) ** 0.5) 
+            
+            img = arr.reshape(3, spatial_size, spatial_size).transpose(1, 2, 0).astype(np.float32)
+            
             if denorm_fn is not None:
                 img = denorm_fn(img)
             else:
@@ -47,10 +50,12 @@ def render_cell(
     else:
         ax.plot(arr, color=color, lw=1.0)
         ax.grid(True, alpha=0.2)
+        
     for spine in ax.spines.values():
         spine.set_edgecolor(color)
         spine.set_linewidth(2)
         spine.set_visible(True)
+        
     ax.set_xticks([])
     ax.set_yticks([])
 

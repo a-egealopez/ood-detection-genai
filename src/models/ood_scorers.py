@@ -3,9 +3,14 @@ from __future__ import annotations
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
 DEFAULT_KNN_K: int = 1
+
+# for unet results!
+_MAHAL_MAX_DIM = 2048
+_MAHAL_PCA_COMPONENTS = 256
 
 
 def compute_ood_score(
@@ -35,6 +40,11 @@ def compute_ood_score(
 
     if mode == "mahalanobis":
         _assert_not_none(feat)
+        # for unet results!
+        if reference is not None and "pca_components" in reference:
+            pca_mean = reference["pca_mean"].to(feat.device)
+            pca_components = reference["pca_components"].to(feat.device)  # (K, D)
+            feat = (feat.reshape(feat.shape[0], -1) - pca_mean) @ pca_components.T
         mu = reference["mahalanobis_mean"].to(feat.device)
         cov_inv = reference["mahalanobis_cov_inv"].to(feat.device)
         diff = feat - mu
@@ -64,23 +74,40 @@ def build_latent_reference(
     z = torch.as_tensor(latents, dtype=torch.float32)
     N, D = z.shape
 
-    mu = z.mean(dim=0)
-    centered = z - mu
+    # for unet results!
+    pca_mean_t: torch.Tensor | None = None
+    pca_components_t: torch.Tensor | None = None
+    if D > _MAHAL_MAX_DIM:
+        n_components = min(_MAHAL_PCA_COMPONENTS, N - 1, D)
+        print(f"  [build_latent_reference] D={D} > {_MAHAL_MAX_DIM}: PCA({n_components}) for Mahalanobis")
+        pca = PCA(n_components=n_components)
+        z_pca = torch.as_tensor(pca.fit_transform(z.cpu().numpy()), dtype=torch.float32)
+        pca_mean_t = torch.as_tensor(pca.mean_, dtype=torch.float32)
+        pca_components_t = torch.as_tensor(pca.components_, dtype=torch.float32)  # (K, D)
+    else:
+        z_pca = z
+
+    mu = z_pca.mean(dim=0)
+    centered = z_pca - mu
     cov = (centered.T @ centered) / N
-    cov_reg = cov + reg * torch.eye(D)
+    cov_reg = cov + reg * torch.eye(z_pca.shape[1])
     cov_inv = torch.linalg.inv(cov_reg)
 
     z_knn = z / (z.norm(dim=1, keepdim=True) + 1e-12) if normalize_knn else z
     knn_index = NearestNeighbors(n_neighbors=max(knn_k, 1))
     knn_index.fit(z_knn.cpu().numpy())
 
-    return {
+    ref = {
         "mahalanobis_mean": mu,
         "mahalanobis_cov_inv": cov_inv,
         "knn_index": knn_index,
         "knn_k": max(knn_k, 1),
         "knn_normalize": normalize_knn,
     }
+    if pca_mean_t is not None:
+        ref["pca_mean"] = pca_mean_t
+        ref["pca_components"] = pca_components_t
+    return ref
 
 
 def _assert_not_none(*args):

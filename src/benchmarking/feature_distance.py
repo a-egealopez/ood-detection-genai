@@ -5,11 +5,16 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from sklearn.decomposition import PCA
 
 from src.artifacts import build_experiment_id
 from src.data import build_dataloaders
 from src.evaluation.evaluate import compute_metrics
 from src.models.ood_scorers import DEFAULT_KNN_K, build_latent_reference, compute_ood_score
+
+# Mahalanobis requires inverting a D×D matrix; beyond this threshold apply PCA first.
+_MAHAL_MAX_DIM = 2048
+_MAHAL_PCA_COMPONENTS = 256
 
 
 def _loader_to_numpy(loader, device: torch.device) -> np.ndarray:
@@ -17,7 +22,9 @@ def _loader_to_numpy(loader, device: torch.device) -> np.ndarray:
     with torch.no_grad():
         for x, _ in loader:
             chunks.append(x.to(device).cpu().numpy())
-    return np.concatenate(chunks, axis=0)
+    arr = np.concatenate(chunks, axis=0)
+    # Always return 2-D (N, D): handles both flat (N, D) and image (N, C, H, W) loaders.
+    return arr.reshape(len(arr), -1)
 
 
 def _score_features(features: np.ndarray, ref: dict, mode: str, device: torch.device) -> np.ndarray:
@@ -38,14 +45,23 @@ def run_feature_distance(cfg, device: torch.device, out: str = "") -> Path:
     x_id = _loader_to_numpy(loaders["id_eval"], device)
     x_ood = _loader_to_numpy(loaders["ood_eval"], device)
 
+    current_mode = cfg.distance_type
+
+    # For Mahalanobis on very high-dimensional raw pixels (e.g. 150528-dim), reduce via PCA first.
+    if current_mode == "mahalanobis" and x_train.shape[1] > _MAHAL_MAX_DIM:
+        n_components = min(_MAHAL_PCA_COMPONENTS, x_train.shape[0] - 1, x_train.shape[1])
+        print(f"  [mahalanobis] D={x_train.shape[1]} > {_MAHAL_MAX_DIM}: applying PCA({n_components})")
+        pca = PCA(n_components=n_components, whiten=False)
+        x_train = pca.fit_transform(x_train)
+        x_id    = pca.transform(x_id)
+        x_ood   = pca.transform(x_ood)
+
     ref = build_latent_reference(
         x_train,
         knn_k=int(cfg.ood.get("knn_k", DEFAULT_KNN_K)),
-        normalize_knn=True,  # deep K-NN: normalize for KNN, raw for Mahalanobis
+        normalize_knn=True,
         reg=float(cfg.ood.get("mahalanobis_reg", 1e-5)),
     )
-
-    current_mode = cfg.distance_type
 
     metrics = {}
     id_scores = _score_features(x_id, ref, current_mode, device)

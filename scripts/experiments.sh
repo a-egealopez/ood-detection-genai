@@ -65,15 +65,15 @@ exp_3() { exp_3_train; exp_3_eval; }
 
 exp_4_train() {
     for dataset in $PATH_DATASETS; do
-        should_run vae  && run_loop --skip-eval "unet/vae/base"  "$dataset" "$SEEDS_UNET" "$LRS_UNET"
-        should_run ddpm && run_loop --skip-eval "unet/ddpm/base" "$dataset" "$SEEDS_UNET" "$LRS_UNET"
+        should_run vae  && run_loop --skip-eval "unet/vae/base"  "$dataset" "$SEEDS_UNET" "$LRS_UNET_VAE"
+        should_run ddpm && run_loop --skip-eval "unet/ddpm/base" "$dataset" "$SEEDS_UNET" "$LRS_UNET_DDPM"
     done
 }
 
 exp_4_eval() {
     for dataset in $PATH_DATASETS; do
-        should_run vae  && run_loop --skip-train "unet/vae/base"  "$dataset" "$SEEDS_UNET" "$LRS_UNET"
-        should_run ddpm && run_loop --skip-train "unet/ddpm/base" "$dataset" "$SEEDS_UNET" "$LRS_UNET"
+        should_run vae  && run_loop --skip-train "unet/vae/base"  "$dataset" "$SEEDS_UNET" "$LRS_UNET_VAE"
+        should_run ddpm && run_loop --skip-train "unet/ddpm/base" "$dataset" "$SEEDS_UNET" "$LRS_UNET_DDPM"
     done
 }
 

@@ -52,9 +52,9 @@ MODE_LABELS: dict[str, str] = {
     "elbo": "ELBO",
     "latent_knn": "Latent k-NN",
     "latent_mah": "Latent Mahalanobis",
-    "noise_single": "Single-step MSE",
-    "noise_multi_mse": "Multi-step MSE (z-score)",
-    "noise_multi_cosine": "Multi-step Cosine (z-score)",
+    "noise_single": "Noise Single-step",
+    "noise_multi_mse": "Noise Multi-step MSE",
+    "noise_multi_cosine": "Noise Multi-step Cosine",
     "residual_mah": "Residual Mahalanobis",
     "residual_knn": "Residual k-NN",
 }
@@ -88,7 +88,6 @@ def stage_input_space_viz(ctx: StageContext) -> None:
             id_vecs,
             id_labels,
             ctx.cfg,
-            title=f"Input Space — {metadata.id_name} (ID)",
             projectors=["pca"],
             label_map={i: str(i) for i in range(metadata.ood_label)},
             ood_label=None,
@@ -102,7 +101,6 @@ def stage_input_space_viz(ctx: StageContext) -> None:
             combined_vecs,
             combined_labels,
             ctx.cfg,
-            title=f"Input Space — {metadata.id_name} (ID) vs {metadata.ood_name} (OOD)",
             projectors=["pca"],
             label_map=metadata.label_map,
             ood_label=metadata.ood_label,
@@ -479,11 +477,12 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
         (x_ood, x_recon_ood, "tomato",    "OOD"),
     ]):
         render_cell(axes[row, 0], x_orig[0].cpu(), is_image, color, denorm_fn)
-        axes[row, 0].set_ylabel(f"{tag}\nIterative", fontsize=9, fontweight="bold", color=color)
+        axes[row, 0].set_ylabel(f"{tag}", fontsize=9, fontweight="bold", color=color)
         for idx in range(len(compact_steps)):
             render_cell(axes[row, idx + 1], recon_list[idx], is_image, color, denorm_fn)
 
-    plt.tight_layout()
+    plt.tight_layout(h_pad=0.3)
+    fig.subplots_adjust(hspace=0.05)
     return fig
 
 

@@ -51,9 +51,16 @@ def _fit_ood_reference(
 def _score_loader(model, loader: DataLoader, device: torch.device, mode: str) -> np.ndarray:
     model.eval()
     scores: list[np.ndarray] = []
+    uses_start_idx = hasattr(model, "_fixed_noise")
+    start = 0
     with torch.no_grad():
         for x, _ in tqdm(loader, desc=f"  scoring [{mode}]", leave=False):
-            scores.append(model.ood_score(x.to(device), mode=mode))
+            x = x.to(device)
+            if uses_start_idx:
+                scores.append(model.ood_score(x, mode=mode, start_idx=start))
+            else:
+                scores.append(model.ood_score(x, mode=mode))
+            start += len(x)
     return np.concatenate(scores)
 
 
@@ -66,7 +73,8 @@ def compute_all_scores(
     if hasattr(model, "set_ood_reference"):
         model.set_ood_reference(reference)
 
-    modes = sorted(getattr(model, "SCORE_MODES", {"recon"}))
+    skip_scores = set(cfg.evaluation.get("skip_scores", []) if cfg else [])
+    modes = sorted(m for m in getattr(model, "SCORE_MODES", {"recon"}) if m not in skip_scores)
     scores_by_mode: dict = {}
     for mode in modes:
         scores_by_mode[f"id_{mode}"] = _score_loader(model, loaders["id_eval"], device, mode)

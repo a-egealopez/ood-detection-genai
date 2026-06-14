@@ -28,7 +28,7 @@ training:
   warmup_epochs: 30
   use_ema: true
   early_stopping: true
-  early_stopping_patience: 100
+  early_stopping_patience: 50
 
 ood:
   primary_score: noise_single

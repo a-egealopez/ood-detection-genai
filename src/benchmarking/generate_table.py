@@ -20,7 +20,12 @@ REQUIRED_COLUMNS = [
     "tpr_at_5_fpr",
 ]
 
-METHOD_ALIASES = {"vae_toy": "vae", "ddpm_toy": "ddpm", "vae_path": "vae", "ddpm_path": "ddpm"}
+METHOD_ALIASES = {
+    "vae_toy": "vae", "ddpm_toy": "ddpm",
+    "vae_path": "vae", "ddpm_path": "ddpm",
+    "mlp_vae": "vae", "mlp_ddpm": "ddpm",
+    "unet_vae": "vae", "unet_ddpm": "ddpm",
+}
 
 GENERATIVE_METHODS = {"vae", "ddpm"}
 DISTANCE_METHODS = {"knn", "mahalanobis"}
@@ -48,8 +53,16 @@ _METHOD_DISPLAY = {
 
 # Groups of datasets treated together (one figure + table per group)
 _DATASET_GROUPS = {
+    "mnist": ["mnist"],
     "sicap": ["sicap_c1", "sicap_c12"],
     "pathmnist": ["pathmnist_c1", "pathmnist_c2"],
+}
+
+# Prefix of method names to keep per group; distance methods (knn/mahalanobis) are always kept.
+_GROUP_ARCH_FILTER: dict[str, str | None] = {
+    "mnist": "unet",
+    "pathmnist": "unet",
+    "sicap": "mlp",
 }
 
 
@@ -305,7 +318,7 @@ def _plot_methods_comparison(
                     continue
                 best = rows.loc[rows["auroc"].idxmax()]
                 values.append(float(best["auroc"]))
-                errors.append(0.0)
+                errors.append(float("nan"))
             else:
                 sub_agg = agg[(agg["dataset"] == dataset) & (agg["method"] == meth)]
                 if sub_agg.empty:
@@ -358,7 +371,9 @@ def run_aggregate_tables(
     if not src.exists():
         raise FileNotFoundError(f"File not found: {src}")
 
-    df = _validate(pd.read_csv(src))
+    raw = pd.read_csv(src)
+    raw["_orig_method"] = raw["method"].astype(str).str.strip().str.lower()
+    df = _validate(raw)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -366,15 +381,25 @@ def run_aggregate_tables(
 
     any_group_found = False
     for group_name, candidate_datasets in _DATASET_GROUPS.items():
-        key_datasets = [d for d in candidate_datasets if d in df["dataset"].values]
+        arch_prefix = _GROUP_ARCH_FILTER.get(group_name)
+        if arch_prefix:
+            arch_mask = (
+                df["_orig_method"].str.startswith(arch_prefix)
+                | df["_orig_method"].isin(["knn", "mahalanobis"])
+            )
+            gdf = df[arch_mask].copy()
+        else:
+            gdf = df.copy()
+
+        key_datasets = [d for d in candidate_datasets if d in gdf["dataset"].values]
         if not key_datasets:
             continue
         any_group_found = True
 
-        gen_mask = df["method"].isin(GENERATIVE_METHODS) & df["dataset"].isin(key_datasets)
-        gen = df[gen_mask].copy()
+        gen_mask = gdf["method"].isin(GENERATIVE_METHODS) & gdf["dataset"].isin(key_datasets)
+        gen = gdf[gen_mask].copy()
 
-        dist_df = df[df["method"].isin(DISTANCE_METHODS) & df["dataset"].isin(key_datasets)].copy()
+        dist_df = gdf[gdf["method"].isin(DISTANCE_METHODS) & gdf["dataset"].isin(key_datasets)].copy()
         dist_df["t_steps"] = 10
         dist_df["lr"] = np.nan
         dist_df["score"] = "--"
@@ -389,17 +414,18 @@ def run_aggregate_tables(
         )
         agg.columns = ["_".join(c).rstrip("_") for c in agg.columns]
 
+        arch_note = f" (UNet)" if arch_prefix == "unet" else f" (MLP)" if arch_prefix == "mlp" else ""
         ds_label = group_name.upper()
         _write_tab_results_tex(
             agg, key_datasets, out, suffix=group_name,
             caption=(
-                f"Resultados completos en {ds_label}: AUROC, AUPR y FPR@95\\%"
+                f"Resultados completos en {ds_label}{arch_note}: AUROC, AUPR y FPR@95\\%"
                 r" (media~$\pm$~desv.\ típica). Mejor AUROC por grupo en negrita."
             ),
             label=f"tab:results_{group_name}_full",
         )
 
-        dist = df[df["method"].isin(DISTANCE_METHODS) & df["dataset"].isin(key_datasets)].copy()
+        dist = gdf[gdf["method"].isin(DISTANCE_METHODS) & gdf["dataset"].isin(key_datasets)].copy()
         _write_tab_comparison_tex(agg, dist, key_datasets, out, suffix=group_name)
         _plot_methods_comparison(
             agg, dist, key_datasets, out, suffix=group_name, group_title=group_name.upper()

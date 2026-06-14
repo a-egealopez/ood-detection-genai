@@ -15,17 +15,17 @@ _DDPM_SCORE_MODES = [
 ]
 _MODE_COLORS = {
     "noise_single": "steelblue",
-    "noise_multi_mse": "darkorange",
-    "noise_multi_cosine": "mediumseagreen",
-    "recon_single": "mediumpurple",
+    "noise_multi_mse": "royalblue",
+    "noise_multi_cosine": "cornflowerblue",
+    "recon_single": "tomato",
     "recon_multi": "crimson",
 }
 _MODE_LABELS = {
-    "noise_single": "Single-step MSE",
-    "noise_multi_mse": "Multi-step MSE (z-score)",
-    "noise_multi_cosine": "Multi-step Cosine (z-score)",
-    "recon_single": "Single-step Reconstruction",
-    "recon_multi": "Multi-step Reconstruction",
+    "noise_single": "Noise Single-step",
+    "noise_multi_mse": "Noise Multi-step MSE",
+    "noise_multi_cosine": "Noise Multi-step Cosine",
+    "recon_single": "Recon Single-step",
+    "recon_multi": "Recon Multi-step",
 }
 
 # Groups of datasets that share a figure and y-axis limits
@@ -94,6 +94,12 @@ def _write_ablation_tex(
         sub = grouped_all[grouped_all["dataset"] == dataset]
         for mode in _DDPM_SCORE_MODES:
             mode_sub = sub[sub["score"] == mode].set_index("T")
+            mode_means = {
+                t: mode_sub.loc[t, "AUROC"]
+                for t in t_vals_all
+                if t in mode_sub.index and pd.notna(mode_sub.loc[t, "AUROC"])
+            }
+            best_t = max(mode_means, key=mode_means.get) if mode_means else None
             cells = []
             for t in t_vals_all:
                 if t not in mode_sub.index:
@@ -102,9 +108,16 @@ def _write_ablation_tex(
                 mean = mode_sub.loc[t, "AUROC"]
                 std = mode_sub.loc[t, "AUROC_std"]
                 if pd.notna(std) and std > 0:
-                    cells.append(f"${mean:.4f} \\pm {std:.4f}$")
+                    if t == best_t:
+                        cell = f"$\\mathbf{{{mean:.4f}}} \\pm \\mathbf{{{std:.4f}}}$"
+                    else:
+                        cell = f"${mean:.4f} \\pm {std:.4f}$"
                 else:
-                    cells.append(f"{mean:.4f}")
+                    if t == best_t:
+                        cell = f"\\textbf{{{mean:.4f}}}"
+                    else:
+                        cell = f"{mean:.4f}"
+                cells.append(cell)
             lines.append(_MODE_LABELS[mode] + " & " + " & ".join(cells) + r" \\")
     lines += [r"\bottomrule", r"\end{longtable}"]
     tex_path = out / f"table_ablation_t_{suffix}.tex"
@@ -112,65 +125,88 @@ def _write_ablation_tex(
     print(f"Saved → {tex_path}")
 
 
+_CHART_MODES = ["noise_single", "recon_single", "noise_multi_mse", "recon_multi"]
+_CHART_YMIN = 0.75
+
+
 def _plot_ablation_group(
     abl: pd.DataFrame, datasets: list[str], out: Path, suffix: str, group_title: str
 ) -> None:
-    """Bar plot AUROC vs T for one group of datasets with shared y-axis limits."""
-    # Pre-compute global y_min / y_max across all datasets in this group
-    all_stats = abl[abl["dataset"].isin(datasets)].groupby(["score", "t_steps"])["auroc"].agg(
-        ["mean", "std"]
+    """Bar plot AUROC vs T (cosine excluded).
+
+    At each T exactly the modes with data are drawn as a touching pair:
+    singles (noise_single + recon_single) at T=1,
+    multi (noise_multi_mse + recon_multi) at T>1.
+    """
+    chart_abl = abl[abl["score"].isin(_CHART_MODES)]
+    valid_means = (
+        chart_abl[chart_abl["dataset"].isin(datasets)]
+        .groupby(["score", "t_steps"])["auroc"].mean()
+        .dropna()
     )
-    valid_means = all_stats["mean"].dropna()
     if valid_means.empty:
         return
-    g_min = float(valid_means.min())
     g_max = float(valid_means.max())
-    pad = 0.05 * (g_max - g_min) if g_max > g_min else 0.05
-    shared_ymin = max(0.0, g_min - pad)
-    shared_ymax = min(1.0, g_max + pad)
+    shared_ymax = min(1.0, g_max + 0.02)
 
     textwidth = 5.65
     fig, axes = plt.subplots(
         1, len(datasets), figsize=(textwidth * len(datasets), textwidth * 0.55), squeeze=False
     )
 
+    bar_width = 0.4  # bars in a pair touch: offset between centers = bar_width
+
     for ax, dataset in zip(axes[0], datasets, strict=True):
         subset = abl[abl["dataset"] == dataset]
         t_vals = sorted(subset["t_steps"].dropna().unique().astype(int))
-        stats = subset.groupby(["score", "t_steps"])["auroc"].agg(["mean", "std"]).reset_index()
+        stats = (
+            subset[subset["score"].isin(_CHART_MODES)]
+            .groupby(["score", "t_steps"])["auroc"]
+            .agg(["mean", "std"])
+            .reset_index()
+        )
 
         x = np.arange(len(t_vals))
-        bar_width = 0.22
-        offsets = np.linspace(-bar_width, bar_width, len(_DDPM_SCORE_MODES))
+        legend_added: set[str] = set()
 
-        for offset, mode in zip(offsets, _DDPM_SCORE_MODES, strict=True):
-            mode_stats = stats[stats["score"] == mode].set_index("t_steps")
-            heights = [
-                float(mode_stats.loc[t, "mean"]) if t in mode_stats.index else np.nan
-                for t in t_vals
+        for t_idx, t in enumerate(t_vals):
+            t_stats = stats[stats["t_steps"] == t]
+            active = [
+                m for m in _CHART_MODES
+                if (t_stats["score"] == m).any()
+                and pd.notna(t_stats.loc[t_stats["score"] == m, "mean"].values[0])
             ]
-            errors = [
-                float(mode_stats.loc[t, "std"]) if t in mode_stats.index else 0.0 for t in t_vals
-            ]
-            ax.bar(
-                x + offset,
-                heights,
-                width=bar_width,
-                yerr=errors,
-                label=_MODE_LABELS[mode],
-                color=_MODE_COLORS[mode],
-                capsize=3,
-                alpha=0.95,
-                edgecolor="black",
-                linewidth=0.5,
-            )
+            n = len(active)
+            if n == 0:
+                continue
+            offsets = (np.arange(n) - (n - 1) / 2) * bar_width
+
+            for i, mode in enumerate(active):
+                row = t_stats[t_stats["score"] == mode]
+                mean = float(row["mean"].values[0])
+                std_val = row["std"].values[0]
+                err = float(std_val) if pd.notna(std_val) and std_val > 0 else None
+                label = _MODE_LABELS[mode] if mode not in legend_added else None
+                legend_added.add(mode)
+                ax.bar(
+                    x[t_idx] + offsets[i],
+                    mean,
+                    width=bar_width,
+                    yerr=err,
+                    label=label,
+                    color=_MODE_COLORS[mode],
+                    capsize=3,
+                    alpha=0.95,
+                    edgecolor="black",
+                    linewidth=0.5,
+                )
 
         ax.set_title(dataset.upper(), fontsize=12, fontweight="bold")
         ax.set_xlabel("n_score_steps (T)")
         ax.set_ylabel("AUROC")
         ax.set_xticks(x)
         ax.set_xticklabels([str(t) for t in t_vals])
-        ax.set_ylim(shared_ymin, shared_ymax)
+        ax.set_ylim(_CHART_YMIN, shared_ymax)
         ax.legend(fontsize=9)
         ax.grid(True, alpha=0.3, axis="y")
 

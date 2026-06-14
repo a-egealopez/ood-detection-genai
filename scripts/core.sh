@@ -22,8 +22,9 @@ SEEDS_PATH="${SEEDS_PATH:-42 107 2024}"
 LRS_VAE_PATH="${LRS_VAE_PATH:-1e-4 5e-4 1e-3}"
 LRS_DDPM_PATH="${LRS_DDPM_PATH:-1e-4 5e-4 1e-3}"
 
-SEEDS_UNET="${SEEDS_UNET:-42 107 2024}"
-LRS_UNET="${LRS_UNET:-1e-4 5e-4}"
+SEEDS_UNET="${SEEDS_UNET:-42}"
+LRS_UNET_VAE="${LRS_UNET_VAE:-1e-4 5e-4 1e-3}"
+LRS_UNET_DDPM="${LRS_UNET_DDPM:-1e-4}"
 
 T_VALUES="${T_VALUES:-5 10 25 50}"
 
@@ -31,18 +32,24 @@ BEST_SEED="${BEST_SEED:-42}"
 BEST_LR_DDPM="${BEST_LR_DDPM:-1e-3}"
 
 BEST_SEED_PATH="${BEST_SEED_PATH:-42}"
-BEST_LR_DDPM_PATH="${BEST_LR_DDPM_PATH:-1e-3}"
+BEST_LR_DDPM_PATH="${BEST_LR_DDPM_PATH:-1e-4}"
 
 LOGS_DIR="${LOGS_DIR:-results/evaluation}"
 OUT_CSV="${OUT_CSV:-results/summary/comparison.csv}"
 
 MODEL=${MODEL:-both}
+SKIP_SCORES="${SKIP_SCORES:-}"
+
 should_run() {
     local target_model=$1
     [[ "$MODEL" == "both" || "$MODEL" == "$target_model" ]]
 }
 
 gpu_select() {
+    if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
+        echo "[gpu] using preset device $CUDA_VISIBLE_DEVICES"
+        return
+    fi
     if command -v nvidia-smi &>/dev/null; then
         CUDA_VISIBLE_DEVICES=$(nvidia-smi --query-gpu=index,memory.free \
             --format=csv,noheader,nounits | sort -t',' -k2 -rn | head -1 \
@@ -73,13 +80,16 @@ run_timed() {
 
 run_loop() {
     local skip_flag=$1 exp=$2 dataset=$3 seeds=$4 lrs=$5
+    local extra_args=()
+    [[ -n "$SKIP_SCORES" ]] && extra_args=(--skip-scores $SKIP_SCORES)
     for seed in $seeds; do
         for lr in $lrs; do
             log_info "[$exp] $dataset seed=$seed lr=$lr"
             run_timed "$exp/$dataset/s$seed/lr$lr" \
                 --mode reconstruction-method \
                 --experiment "$exp" --dataset "$dataset" \
-                --lr "$lr" --seed "$seed" "$skip_flag"
+                --lr "$lr" --seed "$seed" "$skip_flag" \
+                ${extra_args[@]+"${extra_args[@]}"}
         done
     done
 }

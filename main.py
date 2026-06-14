@@ -74,6 +74,13 @@ def _parse_args():
         default=None,
         help="Override DDPM n_score_steps for noise_multi ablation (eval only, no retrain).",
     )
+    p.add_argument(
+        "--skip-scores",
+        nargs="*",
+        default=[],
+        metavar="MODE",
+        help="Score modes to skip during evaluation (e.g. --skip-scores recon_multi recon_single).",
+    )
     p.add_argument("--distance-type", choices=["knn", "mahalanobis"], default="knn")
     p.add_argument("--out", default="")
 
@@ -88,6 +95,8 @@ def _parse_args():
         p.error("--skip-train/--skip-eval/--out not applicable in stats-summary mode")
     if args.n_score_steps is not None and args.mode != "reconstruction-method":
         p.error("--n-score-steps is only valid with --mode reconstruction-method")
+    if args.skip_scores and args.mode != "reconstruction-method":
+        p.error("--skip-scores is only valid with --mode reconstruction-method")
 
     return args
 
@@ -153,6 +162,8 @@ def _mode_reconstruction_method(args):
 
     if args.n_score_steps is not None and "ddpm" in str(cfg.model.get("model_type", "")):
         cfg.model.n_score_steps = args.n_score_steps
+    if args.skip_scores:
+        cfg.evaluation.skip_scores = list(args.skip_scores)
 
     if "ddpm" in str(cfg.model.get("model_type", "")):
         eval_experiment_id = f"{train_experiment_id}_t{int(cfg.model.get('n_score_steps', 10))}"
