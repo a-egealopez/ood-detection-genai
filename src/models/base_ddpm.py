@@ -155,9 +155,8 @@ class BaseDDPMModel(nn.Module, BaseOODModel):
         return self._cosine_dist(pred_noise, noise)
 
     def _fixed_noise(self, shape: tuple, device: torch.device, start_idx: int = 0) -> torch.Tensor:
-        rng = torch.Generator(device=device).manual_seed(self.ood_seed)
-        if start_idx > 0:
-            torch.randn(start_idx * int(np.prod(shape[1:])), generator=rng, device=device)
+        seed = (self.ood_seed + start_idx) & 0xFFFF_FFFF
+        rng = torch.Generator(device=device).manual_seed(seed)
         return torch.randn(shape, generator=rng, device=device)
 
     def _score_timesteps(self, device: torch.device) -> torch.Tensor:
