@@ -10,7 +10,9 @@ Framework for **out-of-distribution (OOD) detection** using generative models. C
 
 OOD detection asks whether a test sample comes from the same distribution the model was trained on. Here, generative models are trained exclusively on in-distribution data and used at inference time to score samples — without any OOD examples during training. The primary application is histopathology: detecting high-grade prostate cancer (Gleason 3–4) as OOD with respect to a model trained on benign tissue (Gleason 1–2).
 
-![DDPM denoising trajectory on MNIST](figures/ddpm_denoising_trajectory_compact.png)
+| DDPM denoising trajectory (UNet · MNIST) | DDPM denoising trajectory (UNet · PathMNIST-C2) |
+|:---:|:---:|
+| ![DDPM denoising trajectory MNIST](assets/ddpm_denoising_trajectory_mnist.png) | ![DDPM denoising trajectory PathMNIST](assets/ddpm_denoising_trajectory_pathmnist.png) |
 
 Developed as a Bachelor's thesis — Universidad de Granada, 2026.
 
@@ -39,8 +41,7 @@ Python 3.10 · PyTorch 2.0+ · see `environment.yml` for the full dependency lis
 ├── scripts/
 │   ├── core.sh                    # Shared helpers and loop primitives
 │   ├── experiments.sh             # Numbered experiment functions (exp_0 … exp_6)
-│   ├── run.sh                     # Entry point for multi-GPU runs
-│   └── copy_results.sh            # Copies figures and tables to figures/ and tables/
+│   └── run.sh                     # Entry point for multi-GPU runs
 ├── src/
 │   ├── models/                    # VAE, DDPM, OOD scorers, base interface
 │   ├── data/                      # Dataset loaders
@@ -66,16 +67,18 @@ The CLI exposes three modes via `--mode`.
 # Train + evaluate
 python main.py \
   --mode reconstruction-method \
-  --experiment vae \
-  --dataset mnist \
+  --experiment mlp/vae/sicap \
+  --dataset sicap_c1 \
   --lr 1e-4 \
   --seed 42
 
 # Evaluate only (requires a saved checkpoint)
 python main.py \
   --mode reconstruction-method \
-  --experiment vae \
-  --dataset mnist \
+  --experiment unet/ddpm/base \
+  --dataset pathmnist_c2 \
+  --lr 1e-4 \
+  --seed 42 \
   --skip-train
 ```
 

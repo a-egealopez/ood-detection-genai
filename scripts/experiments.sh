@@ -52,13 +52,15 @@ exp_2_eval() {
 exp_2() { exp_2_train; exp_2_eval; }
 
 exp_3_train() {
-    should_run vae  && run_loop --skip-eval "unet/vae/base"  mnist "$SEEDS_UNET" "$LRS_UNET"
-    should_run ddpm && run_loop --skip-eval "unet/ddpm/base" mnist "$SEEDS_UNET" "$LRS_UNET"
+    should_run vae  && run_loop --skip-eval "unet/vae/base"  mnist "$SEEDS_UNET_MNIST"       "$LRS_UNET_VAE_MNIST"
+    should_run ddpm && run_loop --skip-eval "unet/ddpm/base" mnist "$SEEDS_UNET_DDPM_MNIST"  "$LRS_UNET_DDPM_MNIST"
+    should_run ddpm && run_loop --skip-eval "unet/ddpm/base" mnist "2024"                    "1e-4"
 }
 
 exp_3_eval() {
-    should_run vae  && run_loop --skip-train "unet/vae/base"  mnist "$SEEDS_UNET" "$LRS_UNET"
-    should_run ddpm && run_loop --skip-train "unet/ddpm/base" mnist "$SEEDS_UNET" "$LRS_UNET"
+    should_run vae  && run_loop --skip-train "unet/vae/base"  mnist "$SEEDS_UNET_MNIST"       "$LRS_UNET_VAE_MNIST"
+    should_run ddpm && run_loop --skip-train "unet/ddpm/base" mnist "$SEEDS_UNET_DDPM_MNIST"  "$LRS_UNET_DDPM_MNIST"
+    should_run ddpm && run_loop --skip-train "unet/ddpm/base" mnist "2024"                    "1e-4"
 }
 
 exp_3() { exp_3_train; exp_3_eval; }

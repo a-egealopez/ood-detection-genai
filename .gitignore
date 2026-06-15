@@ -31,8 +31,12 @@ results/evaluation/
 results/summary/
 wandb/
 scripts/copy_results.sh
+scripts/clean.sh
+scripts/entropy_resolution_analysis.py
+scripts/gen_mnist_asset.py
 logs/
 figures/
+!assets/
 tables/
 latex_chapters/
 .claude/
@@ -68,4 +72,5 @@ Thumbs.db
 *.fdb_latexmk
 *.synctex.gz
 *.blg
-*.bblresults/wandb/
+*.bbl
+results/wandb/
