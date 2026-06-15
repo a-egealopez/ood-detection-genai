@@ -9,6 +9,7 @@ from src.evaluation.plot import render_cell
 
 from .base_vae import BaseVAEModel
 
+
 class UnetVAEModel(BaseVAEModel):
     def __init__(
         self,
@@ -35,8 +36,8 @@ class UnetVAEModel(BaseVAEModel):
             with_decoder_nonlocal_attn=False,
         )
         n_pool = len(channels) - 1
-        latent_spatial = img_size // (2 ** n_pool)
-        self._latent_flat_dim = latent_channels * latent_spatial ** 2
+        latent_spatial = img_size // (2**n_pool)
+        self._latent_flat_dim = latent_channels * latent_spatial**2
         self._recon_fn = nn.MSELoss(reduction="none")
 
     def _flat_latent(self, z_mu: torch.Tensor) -> torch.Tensor:
@@ -101,7 +102,6 @@ class UnetVAEModel(BaseVAEModel):
 
 def build_unet_vae_model(cfg: DictConfig, device: torch.device) -> UnetVAEModel:
     m = cfg.model
-    # data config takes priority (e.g. 224 for pathmnist), falls back to model config or 28
     img_size = int(cfg.data.get("img_size", m.get("img_size", 28)))
     in_channels = int(cfg.data.input_dim) // (img_size * img_size)
     channels = tuple(int(c) for c in m.get("channels", [32, 64, 128]))

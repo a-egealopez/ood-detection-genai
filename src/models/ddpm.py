@@ -86,7 +86,7 @@ class ResidualMLP(nn.Module):
 
         if self._use_fourier:
             x_enc = torch.cat(
-                [self.input_embs[i](x_flat[:, i:i+1]) for i in range(self.input_dim)],
+                [self.input_embs[i](x_flat[:, i : i + 1]) for i in range(self.input_dim)],
                 dim=-1,
             )
         else:
@@ -100,8 +100,15 @@ class ResidualMLP(nn.Module):
 
 class DDPMModel(nn.Module, BaseOODModel):
     SCORE_MODES: frozenset[str] = frozenset(
-        {"noise_single", "noise_multi_mse", "noise_multi_cosine",
-         "recon_single", "recon_multi", "residual_mah", "residual_knn"}
+        {
+            "noise_single",
+            "noise_multi_mse",
+            "noise_multi_cosine",
+            "recon_single",
+            "recon_multi",
+            "residual_mah",
+            "residual_knn",
+        }
     )
 
     def __init__(
@@ -388,7 +395,9 @@ class DDPMModel(nn.Module, BaseOODModel):
         return torch.linspace(t_min, t_max, self.n_score_steps, dtype=torch.long, device=device)
 
     @torch.no_grad()
-    def ood_score(self, x: torch.Tensor, mode: str = "noise_single", start_idx: int = 0) -> np.ndarray:
+    def ood_score(
+        self, x: torch.Tensor, mode: str = "noise_single", start_idx: int = 0
+    ) -> np.ndarray:
         if mode not in self.SCORE_MODES:
             raise ValueError(
                 f"Unknown scoring mode '{mode}'. DDPMModel supports: {sorted(self.SCORE_MODES)}"
@@ -403,8 +412,11 @@ class DDPMModel(nn.Module, BaseOODModel):
 
         if mode == "recon_single":
             traj = self.denoise_trajectory(
-                x, t_start=self.recon_timestep, capture_timesteps=[0],
-                noise=fixed_noise, from_noise=False,
+                x,
+                t_start=self.recon_timestep,
+                capture_timesteps=[0],
+                noise=fixed_noise,
+                from_noise=False,
             )
             return self._mse_score(traj[0], x).cpu().numpy()
 
@@ -418,8 +430,11 @@ class DDPMModel(nn.Module, BaseOODModel):
             for t_step in score_timesteps:
                 t_key = int(t_step.item())
                 traj = self.denoise_trajectory(
-                    x, t_start=t_key, capture_timesteps=[0],
-                    noise=fixed_noise, from_noise=False,
+                    x,
+                    t_start=t_key,
+                    capture_timesteps=[0],
+                    noise=fixed_noise,
+                    from_noise=False,
                 )
                 recon_mse = self._mse_score(traj[0], x)
                 z_scores.append(
@@ -485,7 +500,9 @@ class DDPMModel(nn.Module, BaseOODModel):
         mse_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
         cosine_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
         recon_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
-        _MAX_RECON_REF = 512  # cap iterative recon reference for avoid gpu explosion on large datasets
+        _MAX_RECON_REF = (
+            512  # cap iterative recon reference for avoid gpu explosion on large datasets
+        )
         n_recon_seen = 0
 
         self.eval()
@@ -515,12 +532,13 @@ class DDPMModel(nn.Module, BaseOODModel):
                 for t_step in score_timesteps:
                     t_key = int(t_step.item())
                     traj = self.denoise_trajectory(
-                        x_sub, t_start=t_key, capture_timesteps=[0],
-                        noise=noise_sub, from_noise=False,
+                        x_sub,
+                        t_start=t_key,
+                        capture_timesteps=[0],
+                        noise=noise_sub,
+                        from_noise=False,
                     )
-                    recon_stats_per_t[t_key].extend(
-                        self._mse_score(traj[0], x_sub).cpu().tolist()
-                    )
+                    recon_stats_per_t[t_key].extend(self._mse_score(traj[0], x_sub).cpu().tolist())
                 n_recon_seen += cap
             n_seen += b
 
@@ -533,10 +551,10 @@ class DDPMModel(nn.Module, BaseOODModel):
                 for t_key, vals in stats_dict.items()
             }
 
-        ref["noise_multi_stats_mse"]    = _per_t_stats(mse_stats_per_t)
+        ref["noise_multi_stats_mse"] = _per_t_stats(mse_stats_per_t)
         ref["noise_multi_stats_cosine"] = _per_t_stats(cosine_stats_per_t)
         if not skip_recon_multi:
-            ref["recon_multi_stats"]    = _per_t_stats(recon_stats_per_t)
+            ref["recon_multi_stats"] = _per_t_stats(recon_stats_per_t)
         return ref
 
     def save(self, path: str) -> None:

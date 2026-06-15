@@ -21,10 +21,14 @@ REQUIRED_COLUMNS = [
 ]
 
 METHOD_ALIASES = {
-    "vae_toy": "vae", "ddpm_toy": "ddpm",
-    "vae_path": "vae", "ddpm_path": "ddpm",
-    "mlp_vae": "vae", "mlp_ddpm": "ddpm",
-    "unet_vae": "vae", "unet_ddpm": "ddpm",
+    "vae_toy": "vae",
+    "ddpm_toy": "ddpm",
+    "vae_path": "vae",
+    "ddpm_path": "ddpm",
+    "mlp_vae": "vae",
+    "mlp_ddpm": "ddpm",
+    "unet_vae": "vae",
+    "unet_ddpm": "ddpm",
 }
 
 GENERATIVE_METHODS = {"vae", "ddpm"}
@@ -112,8 +116,12 @@ def _parse_t_from_id(experiment_id: str) -> int | None:
 
 
 def _write_tab_results_tex(
-    agg: pd.DataFrame, datasets: list[str], out: Path, suffix: str,
-    caption: str = "", label: str = "",
+    agg: pd.DataFrame,
+    datasets: list[str],
+    out: Path,
+    suffix: str,
+    caption: str = "",
+    label: str = "",
 ) -> None:
     groups = {"Baselines": ["knn", "mahalanobis"], "VAE": ["vae"], "DDPM": ["ddpm"]}
 
@@ -278,7 +286,7 @@ def _plot_methods_comparison(
         "ddpm": "darkorange",
     }
 
-    # Pre-compute global y_min / y_max across all datasets in this group
+    # compute global y_min / y_max across all datasets/group
     all_values: list[float] = []
     for dataset in datasets:
         for meth in methods:
@@ -289,7 +297,9 @@ def _plot_methods_comparison(
             else:
                 sub_agg = agg[(agg["dataset"] == dataset) & (agg["method"] == meth)]
                 if not sub_agg.empty:
-                    all_values.append(float(sub_agg.loc[sub_agg["auroc_mean"].idxmax(), "auroc_mean"]))
+                    all_values.append(
+                        float(sub_agg.loc[sub_agg["auroc_mean"].idxmax(), "auroc_mean"])
+                    )
 
     if all_values:
         shared_ymin = max(0.0, min(all_values) - 0.05)
@@ -383,9 +393,8 @@ def run_aggregate_tables(
     for group_name, candidate_datasets in _DATASET_GROUPS.items():
         arch_prefix = _GROUP_ARCH_FILTER.get(group_name)
         if arch_prefix:
-            arch_mask = (
-                df["_orig_method"].str.startswith(arch_prefix)
-                | df["_orig_method"].isin(["knn", "mahalanobis"])
+            arch_mask = df["_orig_method"].str.startswith(arch_prefix) | df["_orig_method"].isin(
+                ["knn", "mahalanobis"]
             )
             gdf = df[arch_mask].copy()
         else:
@@ -399,7 +408,9 @@ def run_aggregate_tables(
         gen_mask = gdf["method"].isin(GENERATIVE_METHODS) & gdf["dataset"].isin(key_datasets)
         gen = gdf[gen_mask].copy()
 
-        dist_df = gdf[gdf["method"].isin(DISTANCE_METHODS) & gdf["dataset"].isin(key_datasets)].copy()
+        dist_df = gdf[
+            gdf["method"].isin(DISTANCE_METHODS) & gdf["dataset"].isin(key_datasets)
+        ].copy()
         dist_df["t_steps"] = 10
         dist_df["lr"] = np.nan
         dist_df["score"] = "--"
@@ -414,10 +425,13 @@ def run_aggregate_tables(
         )
         agg.columns = ["_".join(c).rstrip("_") for c in agg.columns]
 
-        arch_note = f" (UNet)" if arch_prefix == "unet" else f" (MLP)" if arch_prefix == "mlp" else ""
+        arch_note = " (UNet)" if arch_prefix == "unet" else " (MLP)" if arch_prefix == "mlp" else ""
         ds_label = group_name.upper()
         _write_tab_results_tex(
-            agg, key_datasets, out, suffix=group_name,
+            agg,
+            key_datasets,
+            out,
+            suffix=group_name,
             caption=(
                 f"Resultados completos en {ds_label}{arch_note}: AUROC, AUPR y FPR@95\\%"
                 r" (media~$\pm$~desv.\ típica). Mejor AUROC por grupo en negrita."
@@ -432,4 +446,6 @@ def run_aggregate_tables(
         )
 
     if not any_group_found:
-        print("No key-dataset data found in CSV (need sicap_c1/sicap_c12 or pathmnist_c1/pathmnist_c2).")
+        print(
+            "No key-dataset data found in CSV (need sicap_c1/sicap_c12 or pathmnist_c1/pathmnist_c2)."
+        )

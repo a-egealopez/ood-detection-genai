@@ -21,6 +21,7 @@ from src.artifacts import save_figure
 if TYPE_CHECKING:
     from src.evaluation.extract import ScoreBundle
 
+
 def _apply_suptitle(fig: plt.Figure, title: str, rect_bottom: float = 0.0) -> None:
     fig.tight_layout()
 
@@ -37,10 +38,10 @@ def render_cell(
         if arr.size == 784:
             ax.imshow(arr.reshape(28, 28), cmap="gray", vmin=-1, vmax=1)
         else:
-            spatial_size = int((arr.size / 3) ** 0.5) 
-            
+            spatial_size = int((arr.size / 3) ** 0.5)
+
             img = arr.reshape(3, spatial_size, spatial_size).transpose(1, 2, 0).astype(np.float32)
-            
+
             if denorm_fn is not None:
                 img = denorm_fn(img)
             else:
@@ -50,12 +51,12 @@ def render_cell(
     else:
         ax.plot(arr, color=color, lw=1.0)
         ax.grid(True, alpha=0.2)
-        
+
     for spine in ax.spines.values():
         spine.set_edgecolor(color)
         spine.set_linewidth(2)
         spine.set_visible(True)
-        
+
     ax.set_xticks([])
     ax.set_yticks([])
 
@@ -130,7 +131,6 @@ def plot_ood_evaluation(
     active_set = {m for m, _, _ in active}
     active_map = {m: (id_a, ood_a) for m, id_a, ood_a in active}
 
-    # determine target width from cfg
     textwidth = 5.95
     try:
         if cfg is not None:
@@ -143,7 +143,7 @@ def plot_ood_evaluation(
         if not chunk:
             continue
 
-        # render one figure per active mode for clarity and publication sizing
+        # render one figure per active mode
         for mode, id_attr, ood_attr in chunk:
             threshold_val = (
                 thresholds[mode]["threshold"] if thresholds and mode in thresholds else None
@@ -303,7 +303,7 @@ def plot_embeddings(
     if unknown:
         raise ValueError(f"Unknown projector(s): {unknown}. Available: {list(PROJECTOR_REGISTRY)}")
 
-    # use configured textwidth and compact height for publication figures
+    # use configured textwidth
     textwidth = 6.0
     try:
         textwidth = float(cfg.viz.get("textwidth_in", textwidth))

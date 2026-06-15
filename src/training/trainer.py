@@ -313,13 +313,24 @@ def train_model(
             if stopper is not None and stopper.step(val_loss):
                 _update_pbar(pbar, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
                 if not _interactive:
-                    _print_epoch_log(model_type, epoch, epochs, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
+                    _print_epoch_log(
+                        model_type,
+                        epoch,
+                        epochs,
+                        epoch_losses,
+                        val_loss,
+                        current_lr,
+                        avg_gnorm,
+                        kl_weight,
+                    )
                 print(f"Early stopping at epoch {epoch} (best val={stopper.best_val:.6f})")
                 break
 
         _update_pbar(pbar, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
         if not _interactive:
-            _print_epoch_log(model_type, epoch, epochs, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight)
+            _print_epoch_log(
+                model_type, epoch, epochs, epoch_losses, val_loss, current_lr, avg_gnorm, kl_weight
+            )
 
         if viz_enabled and (epoch % viz_every == 0 or epoch == 1):
             _training_snapshot(model, loaders, cfg, device, epoch, epochs, run)

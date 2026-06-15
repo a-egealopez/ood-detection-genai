@@ -66,6 +66,7 @@ copy_vae_scores  "mlp_vae_mnist_s${S}_lr${LR_VAE_M}"
 copy_ddpm_scores "mlp_ddpm_mnist_s${S}_lr${LR_DDPM_M}_t${T}"
 copy_vae_scores  "mlp_vae_pathmnist_c1_s${S}_lr${LR_VAE_P}"
 copy_ddpm_scores "mlp_ddpm_pathmnist_c1_s${S}_lr${LR_DDPM_P}_t${T}"
+copy_ddpm_scores "unet_ddpm_pathmnist_c2_s${S}_lr${LR_DDPM_P}_t${T}"
 
 # ── Capítulo 4 · §4.1.2  VAE MNIST / PathMNIST ──────────────────────────────
 copy_vae_eval() {
@@ -92,6 +93,7 @@ copy_ddpm_eval "mlp_ddpm_mnist_s${S}_lr${LR_DDPM_M}_t${T}"
 copy_ddpm_eval "mlp_ddpm_pathmnist_c1_s${S}_lr${LR_DDPM_P}_t${T}"
 # unet_ddpm_mnist: timestep_grid y denoising_trajectory aún no generados
 copy_ddpm_eval "unet_ddpm_pathmnist_c1_s${S}_lr${LR_DDPM_P}_t${T}"
+copy_ddpm_eval "unet_ddpm_pathmnist_c2_s${S}_lr${LR_DDPM_P}_t${T}"
 
 # ── Capítulo 4 · §4.1.4  SICAP (scores VAE + DDPM) ──────────────────────────
 copy_sicap_vae() {
@@ -118,12 +120,20 @@ copy_sicap_ddpm "mlp_ddpm_sicap_c12_s${S}_lr${LR_DDPM_SC12}_t${T}"
 # ── Capítulo 4 · §4.2  Comparativa y ablación ────────────────────────────────
 SUM="results/summary"
 cp_fig "$SUM/sicap_methods_comparison.pdf"
+cp_fig "$SUM/mnist_methods_comparison.pdf"
+cp_fig "$SUM/pathmnist_methods_comparison.pdf"
 cp_fig "$SUM/ablation_t_auroc_sicap.pdf"
+cp_fig "$SUM/ablation_t_auroc_mnist.pdf"
+cp_fig "$SUM/ablation_t_auroc_pathmnist.pdf"
 
 # Tablas .tex → tables/ (referenciadas con \input{tables/...})
 for f in \
     "table_comparison_sicap.tex" \
+    "table_comparison_mnist.tex" \
+    "table_comparison_pathmnist.tex" \
     "table_ablation_t_sicap.tex" \
+    "table_ablation_t_mnist.tex" \
+    "table_ablation_t_pathmnist.tex" \
     "table_results_mnist.tex" \
     "table_results_sicap.tex" \
     "table_results_pathmnist.tex" \

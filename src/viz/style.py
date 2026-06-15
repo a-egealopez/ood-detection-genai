@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 from omegaconf import DictConfig
 
 FIG_W = 5.65  # = textwidth_in
-FIG_H1 = 3.1  # una fila de subplots  (ratio ~0.55)
-FIG_H2 = 6.2  # dos filas             (ratio ~1.10)
-FIG_H3 = 9.3  # tres filas            (ratio ~1.65)
+FIG_H1 = 3.1  # una fila de subplots
+FIG_H2 = 6.2  # dos filas
+FIG_H3 = 9.3  # tres filas
 
 
 def apply_paper_style(cfg: DictConfig | None = None) -> None:
-    # sensible defaults
+    # defaults
     textwidth = 6.0
     savefig_dpi = 300
     if cfg is not None:

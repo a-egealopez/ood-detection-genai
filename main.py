@@ -56,7 +56,16 @@ def _parse_args():
     )
     p.add_argument(
         "--dataset",
-        choices=["mnist", "sicap_c1", "sicap_c12", "moons", "blobs", "pathmnist", "pathmnist_c1", "pathmnist_c2"],
+        choices=[
+            "mnist",
+            "sicap_c1",
+            "sicap_c12",
+            "moons",
+            "blobs",
+            "pathmnist",
+            "pathmnist_c1",
+            "pathmnist_c2",
+        ],
         default="mnist",
     )
     p.add_argument("--seed", type=int)
@@ -209,7 +218,9 @@ def _mode_reconstruction_method(args):
         if not args.skip_eval:
             cfg.viz.plots_dir = str(cfg.viz.eval_plots_dir)
             mt = str(cfg.model.model_type)
-            viz_key = "toy" if cfg.data.dataset in _TOY_DATASETS else ("vae" if "vae" in mt else "ddpm")
+            viz_key = (
+                "toy" if cfg.data.dataset in _TOY_DATASETS else ("vae" if "vae" in mt else "ddpm")
+            )
             if visualize := RECON_VISUALIZERS.get(viz_key):
                 visualize(ctx)
             results = stg.stage_evaluation(ctx)

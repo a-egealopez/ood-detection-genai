@@ -44,7 +44,13 @@ def _build_mnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     if flat_mode:
         id_tf = transforms.Compose([transforms.ToTensor(), norm, flat_tf])
         ood_tf = transforms.Compose(
-            [transforms.Grayscale(1), transforms.Resize((28, 28)), transforms.ToTensor(), norm, flat_tf]
+            [
+                transforms.Grayscale(1),
+                transforms.Resize((28, 28)),
+                transforms.ToTensor(),
+                norm,
+                flat_tf,
+            ]
         )
     else:
         id_tf = transforms.Compose([transforms.ToTensor(), norm])
@@ -89,16 +95,16 @@ def _build_sicap_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
     x_test = np.load(root / "X_test.npy").astype(np.float32)
     y_test = np.load(root / "y_test.npy").squeeze().astype(np.int64)
 
-    id_classes  = cfg.data.get("id_classes",  [1, 2])
+    id_classes = cfg.data.get("id_classes", [1, 2])
     ood_classes = cfg.data.get("ood_classes", [3, 4])
 
     train_mask = np.isin(y_train, id_classes)
-    id_mask    = np.isin(y_test,  id_classes)
-    ood_mask   = np.isin(y_test,  ood_classes)
+    id_mask = np.isin(y_test, id_classes)
+    ood_mask = np.isin(y_test, ood_classes)
 
-    x_train, y_train       = x_train[train_mask], y_train[train_mask]
-    x_test_id, y_test_id   = x_test[id_mask],     y_test[id_mask]
-    x_test_ood, y_test_ood = x_test[ood_mask],    y_test[ood_mask]
+    x_train, y_train = x_train[train_mask], y_train[train_mask]
+    x_test_id, y_test_id = x_test[id_mask], y_test[id_mask]
+    x_test_ood, y_test_ood = x_test[ood_mask], y_test[ood_mask]
 
     if len(x_train) == 0 or len(x_test_id) == 0 or len(x_test_ood) == 0:
         raise ValueError("Class split produced an empty dataset; check train/test classes.")
@@ -230,36 +236,36 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
 
     size = int(cfg.data.get("img_size", 28))
     train_ds = PathMNIST(split="train", download=True, root=root, size=size)
-    test_ds  = PathMNIST(split="test",  download=True, root=root, size=size)
+    test_ds = PathMNIST(split="test", download=True, root=root, size=size)
 
     def to_chw(imgs: np.ndarray) -> np.ndarray:
         return imgs.astype(np.float32).transpose(0, 3, 1, 2) / 127.5 - 1.0
 
     x_train_all = to_chw(train_ds.imgs)
     y_train_all = train_ds.labels.squeeze()
-    x_test_all  = to_chw(test_ds.imgs)
-    y_test_all  = test_ds.labels.squeeze()
+    x_test_all = to_chw(test_ds.imgs)
+    y_test_all = test_ds.labels.squeeze()
 
     train_mask = np.isin(y_train_all, id_classes)
-    id_mask    = np.isin(y_test_all,  id_classes)
-    ood_mask   = np.isin(y_test_all,  ood_classes)
+    id_mask = np.isin(y_test_all, id_classes)
+    ood_mask = np.isin(y_test_all, ood_classes)
 
     x_train, y_train = x_train_all[train_mask], y_train_all[train_mask]
-    x_id,    y_id    = x_test_all[id_mask],     y_test_all[id_mask]
-    x_ood,   y_ood   = x_test_all[ood_mask],    y_test_all[ood_mask]
+    x_id, y_id = x_test_all[id_mask], y_test_all[id_mask]
+    x_ood, y_ood = x_test_all[ood_mask], y_test_all[ood_mask]
 
     if len(x_train) == 0 or len(x_id) == 0 or len(x_ood) == 0:
         raise ValueError("PathMNIST class filtering produced an empty split.")
 
     if flat_mode:
         x_train = x_train.reshape(len(x_train), -1)
-        x_id    = x_id.reshape(len(x_id), -1)
-        x_ood   = x_ood.reshape(len(x_ood), -1)
+        x_id = x_id.reshape(len(x_id), -1)
+        x_ood = x_ood.reshape(len(x_ood), -1)
 
     _mean = np.zeros((1,) + x_train.shape[1:], dtype=np.float32)
-    _std  = np.ones((1,) + x_train.shape[1:], dtype=np.float32)
+    _std = np.ones((1,) + x_train.shape[1:], dtype=np.float32)
     _denorm_mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
-    _denorm_std  = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+    _denorm_std = np.array([0.5, 0.5, 0.5], dtype=np.float32)
 
     def first_n(x, y, n):
         if n is None:
@@ -268,15 +274,15 @@ def _build_pathmnist_dataset(cfg: DictConfig) -> tuple[dict, DataLoaderSpec]:
         return x[:n], y[:n]
 
     x_train, y_train = first_n(x_train, y_train, n_train)
-    x_id,    y_id    = first_n(x_id,    y_id,    n_eval)
-    x_ood,   y_ood   = first_n(x_ood,   y_ood,   n_eval)
+    x_id, y_id = first_n(x_id, y_id, n_eval)
+    x_ood, y_ood = first_n(x_ood, y_ood, n_eval)
 
-    id_tag  = "+".join(str(c) for c in id_classes)
+    id_tag = "+".join(str(c) for c in id_classes)
     ood_tag = "+".join(str(c) for c in ood_classes)
     datasets = {
-        "train":    _to_tensor_dataset(x_train, y_train, _mean, _std),
-        "id_eval":  _to_tensor_dataset(x_id,    y_id,    _mean, _std),
-        "ood_eval": _to_tensor_dataset(x_ood,   y_ood,   _mean, _std),
+        "train": _to_tensor_dataset(x_train, y_train, _mean, _std),
+        "id_eval": _to_tensor_dataset(x_id, y_id, _mean, _std),
+        "ood_eval": _to_tensor_dataset(x_ood, y_ood, _mean, _std),
     }
     return datasets, DataLoaderSpec(
         id_name=f"PathMNIST-ID{id_tag}",

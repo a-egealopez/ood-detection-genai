@@ -19,6 +19,7 @@ if _env_file.exists():
             if _k.strip() != "WANDB_API_KEY":
                 os.environ.setdefault(_k.strip(), _v.strip())
 
+
 class _NoOpRun:
     url = "(wandb disabled)"
 

@@ -15,7 +15,6 @@ _IMG_SIZE = 28
 
 
 class MonaiVAEModel(nn.Module, BaseOODModel):
-
     SCORE_MODES: frozenset[str] = frozenset({"recon", "elbo", "latent_knn", "latent_mah"})
     _SCORER_MODE: dict[str, str] = {"latent_knn": "knn", "latent_mah": "mahalanobis"}
 
@@ -46,8 +45,8 @@ class MonaiVAEModel(nn.Module, BaseOODModel):
         )
 
         n_pool = len(channels) - 1
-        self._latent_spatial = _IMG_SIZE // (2 ** n_pool)
-        self._latent_flat_dim = latent_channels * self._latent_spatial ** 2
+        self._latent_spatial = _IMG_SIZE // (2**n_pool)
+        self._latent_flat_dim = latent_channels * self._latent_spatial**2
 
         self._recon_fn = nn.MSELoss(reduction="none")
 

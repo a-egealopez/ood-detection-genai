@@ -81,7 +81,7 @@ class ResidualMLP(nn.Module):
         t_emb = self.time_emb(t.float().reshape(-1, 1))
         if self._use_fourier:
             x_enc = torch.cat(
-                [self.input_embs[i](x_flat[:, i:i+1]) for i in range(self.input_dim)], dim=-1
+                [self.input_embs[i](x_flat[:, i : i + 1]) for i in range(self.input_dim)], dim=-1
             )
         else:
             x_enc = x_flat
@@ -139,7 +139,9 @@ class MlpDDPMModel(BaseDDPMModel):
 
     def snapshot_fig(self, loaders, cfg, device, epoch, epochs) -> plt.Figure:
         self.eval()
-        is_image = bool(cfg.data.get("is_image", False)) and int(cfg.data.get("input_dim", 0)) == 784
+        is_image = (
+            bool(cfg.data.get("is_image", False)) and int(cfg.data.get("input_dim", 0)) == 784
+        )
         if not is_image and int(cfg.data.get("input_dim", 0)) == 2:
             return self._snapshot_2d(loaders, cfg, device, epoch, epochs)
 
@@ -147,15 +149,17 @@ class MlpDDPMModel(BaseDDPMModel):
         n_cols = 8
         x_batch = x_batch[:n_cols].to(device)
         max_t = self.num_train_timesteps - 1
-        t_grid = torch.tensor([1, 25, 50, 100, 250, 500, 750, max_t], device=device, dtype=torch.long)
+        t_grid = torch.tensor(
+            [1, 25, 50, 100, 250, 500, 750, max_t], device=device, dtype=torch.long
+        )
 
         n_rows = 2 if is_image else 3
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.2 * n_cols, n_rows * 2.5))
 
         with torch.no_grad():
             for i in range(n_cols):
-                x_i = x_batch[i:i + 1]
-                t_i = t_grid[i:i + 1]
+                x_i = x_batch[i : i + 1]
+                t_i = t_grid[i : i + 1]
                 x_recon, _, _ = self.reconstruct_at_t(x_i, t_i)
                 axes[0, i].set_title(f"#{i + 1} t={int(t_i.item())}", fontsize=7)
                 render_cell(axes[0, i], x_i.squeeze(0), is_image, "steelblue")

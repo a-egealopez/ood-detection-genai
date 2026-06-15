@@ -4,22 +4,25 @@ from collections import defaultdict
 from pathlib import Path
 
 DATASETS = {
-    "moons": r"\textit{Moons}", "blobs": r"\textit{Blobs}",
+    "moons": r"\textit{Moons}",
+    "blobs": r"\textit{Blobs}",
     "mnist": "MNIST",
-    "pathmnist_c1": "PathMNIST~(C1)", "pathmnist_c2": "PathMNIST~(C2)",
-    "sicap_c1": "SICAP-C1", "sicap_c12": "SICAP-C12",
+    "pathmnist_c1": "PathMNIST~(C1)",
+    "pathmnist_c2": "PathMNIST~(C2)",
+    "sicap_c1": "SICAP-C1",
+    "sicap_c12": "SICAP-C12",
 }
 MODELS = {
-    ("dist", "knn"):          "KNN",
-    ("dist", "mahalanobis"):  "Mahalanobis",
-    ("mlp",  "vae"):          "MLP-VAE",
-    ("mlp",  "ddpm"):         "MLP-DDPM",
-    ("unet", "vae"):          "UNet-VAE",
-    ("unet", "ddpm"):         "UNet-DDPM",
+    ("dist", "knn"): "KNN",
+    ("dist", "mahalanobis"): "Mahalanobis",
+    ("mlp", "vae"): "MLP-VAE",
+    ("mlp", "ddpm"): "MLP-DDPM",
+    ("unet", "vae"): "UNet-VAE",
+    ("unet", "ddpm"): "UNet-DDPM",
 }
 GROUPS = [
     ("Sintéticos", ["moons", "blobs"]),
-    ("Imágenes",   ["mnist", "pathmnist_c1", "pathmnist_c2"]),
+    ("Imágenes", ["mnist", "pathmnist_c1", "pathmnist_c2"]),
     ("Histología", ["sicap_c1", "sicap_c12"]),
 ]
 
@@ -28,8 +31,10 @@ _TIME_RE = re.compile(r"\[time\]\s+(\S+)\s+->\s+(\d+):(\d+):(\d+)")
 
 def _fmt(s):
     h, m, s = s // 3600, (s % 3600) // 60, s % 60
-    if h: return f"{h}\\,h\\,{m:02d}\\,m"
-    if m: return f"{m}\\,m\\,{s:02d}\\,s"
+    if h:
+        return f"{h}\\,h\\,{m:02d}\\,m"
+    if m:
+        return f"{m}\\,m\\,{s:02d}\\,s"
     return f"{s}\\,s"
 
 
@@ -42,7 +47,9 @@ def _parse(path):
     return None
 
 
-def run_training_times(log_dir: Path | str = "logs", out_dir: Path | str = "results/summary") -> Path:
+def run_training_times(
+    log_dir: Path | str = "logs", out_dir: Path | str = "results/summary"
+) -> Path:
     log_dir = Path(log_dir)
     out_dir = Path(out_dir)
 
@@ -79,8 +86,7 @@ def run_training_times(log_dir: Path | str = "logs", out_dir: Path | str = "resu
         rows = []
         for ds in datasets:
             cells = [r"\quad " + DATASETS[ds]] + [
-                _fmt(data[(mk, ds)]) if (mk, ds) in data else "---"
-                for mk in models
+                _fmt(data[(mk, ds)]) if (mk, ds) in data else "---" for mk in models
             ]
             if any(c != "---" for c in cells[1:]):
                 rows.append("    " + " & ".join(cells) + r" \\")

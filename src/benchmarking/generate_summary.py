@@ -36,7 +36,10 @@ def run_summary(
         # Fallback: parse from experiment_id (folder name)
         experiment_id = fp.parent.name
         if not dataset:
-            m = re.search(r"_(mnist|sicap_c1|sicap_c12|moons|blobs|pathmnist_c1|pathmnist_c2|pathmnist)_", experiment_id)
+            m = re.search(
+                r"_(mnist|sicap_c1|sicap_c12|moons|blobs|pathmnist_c1|pathmnist_c2|pathmnist)_",
+                experiment_id,
+            )
             if m:
                 dataset = m.group(1)
         if not lr:
@@ -53,7 +56,7 @@ def run_summary(
                 t_val = m.group(1)
         if not method:
             parts = experiment_id.split("_")
-            # dist_knn_... → "knn";  vae_... → "vae";  ddpm_toy_... → "ddpm_toy"
+            # dist_knn_... -> "knn";  vae_... -> "vae";  ddpm_toy_... -> "ddpm_toy"
             if parts[0] == "dist" and len(parts) > 1:
                 method = parts[1]
             elif len(parts) > 1 and parts[1] == "toy":

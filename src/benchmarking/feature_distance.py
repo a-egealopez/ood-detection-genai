@@ -50,11 +50,13 @@ def run_feature_distance(cfg, device: torch.device, out: str = "") -> Path:
     # For Mahalanobis on very high-dimensional raw pixels (e.g. 150528-dim), reduce via PCA first.
     if current_mode == "mahalanobis" and x_train.shape[1] > _MAHAL_MAX_DIM:
         n_components = min(_MAHAL_PCA_COMPONENTS, x_train.shape[0] - 1, x_train.shape[1])
-        print(f"  [mahalanobis] D={x_train.shape[1]} > {_MAHAL_MAX_DIM}: applying PCA({n_components})")
+        print(
+            f"  [mahalanobis] D={x_train.shape[1]} > {_MAHAL_MAX_DIM}: applying PCA({n_components})"
+        )
         pca = PCA(n_components=n_components, whiten=False)
         x_train = pca.fit_transform(x_train)
-        x_id    = pca.transform(x_id)
-        x_ood   = pca.transform(x_ood)
+        x_id = pca.transform(x_id)
+        x_ood = pca.transform(x_ood)
 
     ref = build_latent_reference(
         x_train,

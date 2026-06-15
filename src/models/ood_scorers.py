@@ -79,7 +79,9 @@ def build_latent_reference(
     pca_components_t: torch.Tensor | None = None
     if D > _MAHAL_MAX_DIM:
         n_components = min(_MAHAL_PCA_COMPONENTS, N - 1, D)
-        print(f"  [build_latent_reference] D={D} > {_MAHAL_MAX_DIM}: PCA({n_components}) for Mahalanobis")
+        print(
+            f"  [build_latent_reference] D={D} > {_MAHAL_MAX_DIM}: PCA({n_components}) for Mahalanobis"
+        )
         pca = PCA(n_components=n_components)
         z_pca = torch.as_tensor(pca.fit_transform(z.cpu().numpy()), dtype=torch.float32)
         pca_mean_t = torch.as_tensor(pca.mean_, dtype=torch.float32)

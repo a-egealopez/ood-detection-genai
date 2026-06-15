@@ -16,12 +16,18 @@ MODEL_REGISTRY: dict = {
 }
 
 __all__ = [
-    "VAEModel", "build_vae_model",
-    "DDPMModel", "build_ddpm_model",
-    "MlpVAEModel", "build_mlp_vae_model",
-    "MlpDDPMModel", "build_mlp_ddpm_model",
-    "UnetVAEModel", "build_unet_vae_model",
-    "UnetDDPMModel", "build_unet_ddpm_model",
+    "VAEModel",
+    "build_vae_model",
+    "DDPMModel",
+    "build_ddpm_model",
+    "MlpVAEModel",
+    "build_mlp_vae_model",
+    "MlpDDPMModel",
+    "build_mlp_ddpm_model",
+    "UnetVAEModel",
+    "build_unet_vae_model",
+    "UnetDDPMModel",
+    "build_unet_ddpm_model",
     "compute_ood_score",
     "MODEL_REGISTRY",
 ]

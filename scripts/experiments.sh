@@ -107,11 +107,12 @@ exp_6() {
     done
     for dataset in $PATH_DATASETS; do
         for t in $T_VALUES; do
-            run_timed "mlp_ddpm_path/$dataset/T$t" \
+            run_timed "unet_ddpm_path/$dataset/T$t" \
                 --mode reconstruction-method \
-                --experiment "mlp/ddpm/path" --dataset "$dataset" \
-                --lr "$BEST_LR_DDPM_PATH" --seed "$BEST_SEED_PATH" \
-                --n-score-steps "$t" --skip-train
+                --experiment "unet/ddpm/base" --dataset "$dataset" \
+                --lr "$LRS_UNET_DDPM" --seed "$SEEDS_UNET" \
+                --n-score-steps "$t" --skip-train \
+                --skip-scores recon_single recon_multi
         done
     done
 }

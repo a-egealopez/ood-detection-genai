@@ -60,7 +60,6 @@ MODE_LABELS: dict[str, str] = {
 }
 
 
-
 def _make_denorm(cfg):
     img_mean = cfg.data.get("img_mean", None)
     img_std = cfg.data.get("img_std", None)
@@ -404,29 +403,39 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
 
     if mode == "full":
         keyframes = _ddpm_keyframes(max_t)
-        x_id  = next(iter(ctx.loaders["id_eval"]))[0][: len(keyframes)].to(ctx.device)
+        x_id = next(iter(ctx.loaders["id_eval"]))[0][: len(keyframes)].to(ctx.device)
         x_ood = next(iter(ctx.loaders["ood_eval"]))[0][: len(keyframes)].to(ctx.device)
         t_values = torch.tensor(keyframes, device=ctx.device, dtype=torch.long)[: x_id.shape[0]]
-        noise_id  = ctx.model._fixed_noise(x_id.shape, ctx.device)
+        noise_id = ctx.model._fixed_noise(x_id.shape, ctx.device)
         noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
 
         with torch.no_grad():
-            _id_pairs  = [ctx.model.reconstruct_at_t(x_id[i:i+1],  t_values[i:i+1], noise=noise_id[i:i+1])  for i in range(len(keyframes))]
-            _ood_pairs = [ctx.model.reconstruct_at_t(x_ood[i:i+1], t_values[i:i+1], noise=noise_ood[i:i+1]) for i in range(len(keyframes))]
-            x_recon_id  = torch.stack([p[0][0] for p in _id_pairs])
-            x_noisy_id  = torch.stack([p[1][0] for p in _id_pairs])
+            _id_pairs = [
+                ctx.model.reconstruct_at_t(
+                    x_id[i : i + 1], t_values[i : i + 1], noise=noise_id[i : i + 1]
+                )
+                for i in range(len(keyframes))
+            ]
+            _ood_pairs = [
+                ctx.model.reconstruct_at_t(
+                    x_ood[i : i + 1], t_values[i : i + 1], noise=noise_ood[i : i + 1]
+                )
+                for i in range(len(keyframes))
+            ]
+            x_recon_id = torch.stack([p[0][0] for p in _id_pairs])
+            x_noisy_id = torch.stack([p[1][0] for p in _id_pairs])
             x_recon_ood = torch.stack([p[0][0] for p in _ood_pairs])
             x_noisy_ood = torch.stack([p[1][0] for p in _ood_pairs])
 
         n_cols = len(keyframes) + 1
         fig, axes = plt.subplots(6, n_cols, figsize=(2.0 * n_cols, 1.8 * 6))
         rows_spec = [
-            ("ID\nOriginal",    x_id,        "steelblue", None),
-            ("ID\nNoisy (x_t)", x_noisy_id,  "steelblue", t_values),
-            ("ID\nIterative",   x_recon_id,  "steelblue", t_values),
-            ("OOD\nOriginal",   x_ood,       "tomato",    None),
-            ("OOD\nNoisy (x_t)",x_noisy_ood, "tomato",    t_values),
-            ("OOD\nIterative",  x_recon_ood, "tomato",    t_values),
+            ("ID\nOriginal", x_id, "steelblue", None),
+            ("ID\nNoisy (x_t)", x_noisy_id, "steelblue", t_values),
+            ("ID\nIterative", x_recon_id, "steelblue", t_values),
+            ("OOD\nOriginal", x_ood, "tomato", None),
+            ("OOD\nNoisy (x_t)", x_noisy_ood, "tomato", t_values),
+            ("OOD\nIterative", x_recon_ood, "tomato", t_values),
         ]
         for row, (title, batch, color, t_vals) in enumerate(rows_spec):
             axes[row, 0].set_ylabel(title, fontsize=9, fontweight="bold", color=color)
@@ -437,12 +446,30 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
                 if t_vals is not None:
                     ax.set_title(f"t={t_vals[col].item()}", fontsize=7, color=color, pad=2)
 
-        fig.text(0.99, 0.75, "ID",  fontsize=16, fontweight="bold", color="steelblue", va="center", ha="right")
-        fig.text(0.99, 0.25, "OOD", fontsize=16, fontweight="bold", color="tomato",    va="center", ha="right")
+        fig.text(
+            0.99,
+            0.75,
+            "ID",
+            fontsize=16,
+            fontweight="bold",
+            color="steelblue",
+            va="center",
+            ha="right",
+        )
+        fig.text(
+            0.99,
+            0.25,
+            "OOD",
+            fontsize=16,
+            fontweight="bold",
+            color="tomato",
+            va="center",
+            ha="right",
+        )
         plt.tight_layout()
         return fig
 
-    # ── compact ──────────────────────────────────────────────────────────────
+    # compact
     compact_steps = [
         int(max_t * 0.05),
         int(max_t * 0.15),
@@ -451,17 +478,17 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
         max_t,
     ]
 
-    x_id  = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
+    x_id = next(iter(ctx.loaders["id_eval"]))[0][:1].to(ctx.device)
     x_ood = next(iter(ctx.loaders["ood_eval"]))[0][:1].to(ctx.device)
-    noise_id  = ctx.model._fixed_noise(x_id.shape, ctx.device)
+    noise_id = ctx.model._fixed_noise(x_id.shape, ctx.device)
     noise_ood = ctx.model._fixed_noise(x_ood.shape, ctx.device)
 
-    x_recon_id,  x_recon_ood = [], []
+    x_recon_id, x_recon_ood = [], []
 
     with torch.no_grad():
         for t in compact_steps:
             t_tensor = torch.tensor([t], device=ctx.device, dtype=torch.long)
-            rec_id,  _, _ = ctx.model.reconstruct_at_t(x_id,  t_tensor, noise=noise_id)
+            rec_id, _, _ = ctx.model.reconstruct_at_t(x_id, t_tensor, noise=noise_id)
             rec_ood, _, _ = ctx.model.reconstruct_at_t(x_ood, t_tensor, noise=noise_ood)
             x_recon_id.append(rec_id[0].cpu())
             x_recon_ood.append(rec_ood[0].cpu())
@@ -472,10 +499,12 @@ def _build_ddpm_timestep_grid(ctx: StageContext, metadata: DatasetMetadata) -> p
     for col_i, t in enumerate(compact_steps):
         axes[0, col_i + 1].set_title(f"t={t}", fontsize=8)
 
-    for row, (x_orig, recon_list, color, tag) in enumerate([
-        (x_id,  x_recon_id,  "steelblue", "ID"),
-        (x_ood, x_recon_ood, "tomato",    "OOD"),
-    ]):
+    for row, (x_orig, recon_list, color, tag) in enumerate(
+        [
+            (x_id, x_recon_id, "steelblue", "ID"),
+            (x_ood, x_recon_ood, "tomato", "OOD"),
+        ]
+    ):
         render_cell(axes[row, 0], x_orig[0].cpu(), is_image, color, denorm_fn)
         axes[row, 0].set_ylabel(f"{tag}", fontsize=9, fontweight="bold", color=color)
         for idx in range(len(compact_steps)):
@@ -504,11 +533,16 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         trajs = []
         for seed in range(n_runs):
             rng = torch.Generator(device=ctx.device).manual_seed(seed)
-            noise = torch.randn(x_shape.shape, generator=rng, device=ctx.device, dtype=x_shape.dtype)
+            noise = torch.randn(
+                x_shape.shape, generator=rng, device=ctx.device, dtype=x_shape.dtype
+            )
             trajs.append(
                 ctx.model.denoise_trajectory(
-                    x_shape, t_start=t_gen, capture_timesteps=keyframes,
-                    noise=noise, from_noise=True,
+                    x_shape,
+                    t_start=t_gen,
+                    capture_timesteps=keyframes,
+                    noise=noise,
+                    from_noise=True,
                 )
             )
 
@@ -539,13 +573,18 @@ def _build_ddpm_denoising_trajectory(ctx: StageContext, metadata: DatasetMetadat
         noise = torch.randn(x_shape.shape, generator=rng, device=ctx.device, dtype=x_shape.dtype)
         trajs.append(
             ctx.model.denoise_trajectory(
-                x_shape, t_start=t_gen, capture_timesteps=capture_timesteps,
-                noise=noise, from_noise=True,
+                x_shape,
+                t_start=t_gen,
+                capture_timesteps=capture_timesteps,
+                noise=noise,
+                from_noise=True,
             )
         )
 
     n_cols = len(capture_timesteps)
-    fig, axes = plt.subplots(2, n_cols, figsize=(textwidth * n_cols / 5, style.FIG_H1), squeeze=False)
+    fig, axes = plt.subplots(
+        2, n_cols, figsize=(textwidth * n_cols / 5, style.FIG_H1), squeeze=False
+    )
 
     for row, traj in enumerate(trajs):
         axes[row, 0].set_ylabel(f"Run {row + 1}", fontsize=9, fontweight="bold")

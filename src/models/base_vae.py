@@ -44,9 +44,7 @@ class BaseVAEModel(nn.Module, BaseOODModel):
     @torch.no_grad()
     def ood_score(self, x: torch.Tensor, mode: str = "recon") -> np.ndarray:
         if mode not in self.SCORE_MODES:
-            raise ValueError(
-                f"Unknown scoring mode '{mode}'. Supports: {sorted(self.SCORE_MODES)}"
-            )
+            raise ValueError(f"Unknown scoring mode '{mode}'. Supports: {sorted(self.SCORE_MODES)}")
         x_flat, x_recon_flat, z_flat, z_logvar_flat = self._prepare_ood_inputs(x)
         scores = compute_ood_score(
             x=x_flat,

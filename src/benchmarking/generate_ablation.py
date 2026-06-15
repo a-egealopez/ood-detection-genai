@@ -10,8 +10,11 @@ import pandas as pd
 from src.artifacts import save_figure
 
 _DDPM_SCORE_MODES = [
-    "noise_single", "noise_multi_mse", "noise_multi_cosine",
-    "recon_single", "recon_multi",
+    "noise_single",
+    "noise_multi_mse",
+    "noise_multi_cosine",
+    "recon_single",
+    "recon_multi",
 ]
 _MODE_COLORS = {
     "noise_single": "steelblue",
@@ -28,7 +31,7 @@ _MODE_LABELS = {
     "recon_multi": "Recon Multi-step",
 }
 
-# Groups of datasets that share a figure and y-axis limits
+
 _DATASET_GROUPS = {
     "sicap": ["sicap_c1", "sicap_c12"],
     "pathmnist": ["pathmnist_c1", "pathmnist_c2"],
@@ -132,16 +135,11 @@ _CHART_YMIN = 0.75
 def _plot_ablation_group(
     abl: pd.DataFrame, datasets: list[str], out: Path, suffix: str, group_title: str
 ) -> None:
-    """Bar plot AUROC vs T (cosine excluded).
-
-    At each T exactly the modes with data are drawn as a touching pair:
-    singles (noise_single + recon_single) at T=1,
-    multi (noise_multi_mse + recon_multi) at T>1.
-    """
     chart_abl = abl[abl["score"].isin(_CHART_MODES)]
     valid_means = (
         chart_abl[chart_abl["dataset"].isin(datasets)]
-        .groupby(["score", "t_steps"])["auroc"].mean()
+        .groupby(["score", "t_steps"])["auroc"]
+        .mean()
         .dropna()
     )
     if valid_means.empty:
@@ -172,7 +170,8 @@ def _plot_ablation_group(
         for t_idx, t in enumerate(t_vals):
             t_stats = stats[stats["t_steps"] == t]
             active = [
-                m for m in _CHART_MODES
+                m
+                for m in _CHART_MODES
                 if (t_stats["score"] == m).any()
                 and pd.notna(t_stats.loc[t_stats["score"] == m, "mean"].values[0])
             ]
@@ -228,11 +227,7 @@ def run_t_ablation(
     csv_path: str = "results/summary/comparison.csv",
     out_dir: str = "results/summary",
 ) -> None:
-    """Fig 12: AUROC vs T line plot. Tab 13: T ablation table (markdown + LaTeX).
-
-    Produces one figure + table per dataset group (sicap, pathmnist).
-    Within each figure all subplots share the same y-axis lower bound.
-    """
+    # Fig 12: AUROC vs T line plot. Tab 13: T ablation table
     src = Path(csv_path)
     if not src.exists():
         raise FileNotFoundError(f"File not found: {src}")
@@ -245,7 +240,7 @@ def run_t_ablation(
         print("No T-ablation data found (need DDPM key-dataset experiments with varying T).")
         return
 
-    # single-step modes have a fixed T — assign T=1 for plotting
+    # single-step modes as T=1 for plotting
     abl.loc[abl["score"].isin(["noise_single", "recon_single"]), "t_steps"] = 1
 
     for group_name, candidate_datasets in _DATASET_GROUPS.items():
@@ -255,7 +250,9 @@ def run_t_ablation(
 
         group_abl = abl[abl["dataset"].isin(datasets)].copy()
 
-        _plot_ablation_group(group_abl, datasets, out, suffix=group_name, group_title=group_name.upper())
+        _plot_ablation_group(
+            group_abl, datasets, out, suffix=group_name, group_title=group_name.upper()
+        )
 
         grouped_all = (
             group_abl.groupby(["dataset", "score", "t_steps"])["auroc"]

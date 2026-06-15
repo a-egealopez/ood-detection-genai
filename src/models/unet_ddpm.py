@@ -8,6 +8,7 @@ from src.evaluation.plot import render_cell
 
 from .base_ddpm import BaseDDPMModel
 
+
 class UnetDDPMModel(BaseDDPMModel):
     def __init__(
         self,
@@ -64,15 +65,16 @@ class UnetDDPMModel(BaseDDPMModel):
 
         t_grid = torch.tensor(
             [1, 25, 50, 100, 250, 500, 750, self.num_train_timesteps - 1],
-            device=device, dtype=torch.long,
+            device=device,
+            dtype=torch.long,
         )
 
         fig, axes = plt.subplots(3, n_cols, figsize=(2.2 * n_cols, 7))
 
         with torch.no_grad():
             for i in range(n_cols):
-                x_i = x_batch[i:i + 1]
-                t_i = t_grid[i:i + 1]
+                x_i = x_batch[i : i + 1]
+                t_i = t_grid[i : i + 1]
                 x_recon, x_noisy, _ = self.reconstruct_at_t(x_i, t_i)
                 axes[0, i].set_title(f"#{i + 1} t={int(t_i.item())}", fontsize=7)
                 render_cell(axes[0, i], x_i.squeeze(0), is_image, "steelblue")
@@ -82,8 +84,7 @@ class UnetDDPMModel(BaseDDPMModel):
         axes[0, 0].set_ylabel("ORIGINAL", fontsize=9, fontweight="bold")
         axes[1, 0].set_ylabel("NOISY", fontsize=9, fontweight="bold")
         axes[2, 0].set_ylabel("RECON", fontsize=9, fontweight="bold")
-        fig.text(0.5, 0.01, "Columns = different timesteps of corruption.",
-                 ha="center", fontsize=9)
+        fig.text(0.5, 0.01, "Columns = different timesteps of corruption.", ha="center", fontsize=9)
         plt.tight_layout()
         self.train()
         return fig

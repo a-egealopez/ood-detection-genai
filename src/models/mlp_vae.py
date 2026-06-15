@@ -67,10 +67,13 @@ class MlpVAEModel(BaseVAEModel):
     def snapshot_fig(self, loaders, cfg, device, epoch, epochs) -> plt.Figure:
         print(f"\n  Latent snapshot (epoch {epoch}/{epochs})")
         from src.evaluation.extract import extract_representations
+
         zs, labs = extract_representations(self, loaders["id_eval"], device)
         unique = sorted(set(labs.tolist()))
         return plot_embeddings(
-            zs, labs, cfg,
+            zs,
+            labs,
+            cfg,
             title=f"Latent Space — epoch {epoch}/{epochs}",
             label_map={v: str(v) for v in unique},
         )

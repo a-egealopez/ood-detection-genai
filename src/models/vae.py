@@ -125,7 +125,6 @@ class VAEModel(nn.Module, BaseOODModel):
 
     SCORE_MODES: frozenset[str] = frozenset({"recon", "elbo", "latent_knn", "latent_mah"})
 
-    # Maps public score mode names to the internal strings expected by compute_ood_score.
     _SCORER_MODE: dict[str, str] = {"latent_knn": "knn", "latent_mah": "mahalanobis"}
 
     @torch.no_grad()
