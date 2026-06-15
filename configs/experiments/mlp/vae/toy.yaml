@@ -12,7 +12,7 @@ training:
   scheduler: cosine
   batch_size: 16
   warmup_epochs: 10
-  kl_weight: 0.01
+  kl_weight: 0.001
   kl_warmup_epochs: 20
 
 ood:

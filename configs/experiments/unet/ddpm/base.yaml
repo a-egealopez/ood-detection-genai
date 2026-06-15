@@ -12,7 +12,7 @@ model:
   beta_end: 0.02
   prediction_type: epsilon
   clip_sample: true
-  n_score_steps: 10
+  n_score_steps: 5
   recon_timestep: 100
   noise_timestep: 100
 
@@ -33,6 +33,10 @@ training:
 ood:
   primary_score: noise_single
   knn_k: 1
+
+evaluation:
+  eval_batch_size: 64
+  n_train_ref_samples: 5000
 
 wandb:
   tags: [ood, unet_ddpm]

@@ -345,24 +345,45 @@ def _build_reconstruction_fig_vae(
     denorm_fn = _make_denorm(ctx.cfg)
 
     if compact:
-        fig, axes = plt.subplots(2, n_samples * 2, figsize=(textwidth, style.FIG_H1), squeeze=False)
+        n_cols = n_samples * 2
+        fig, axes = plt.subplots(
+            2, n_cols,
+            figsize=(textwidth * n_cols / 4, style.FIG_H1),
+            squeeze=False,
+        )
 
         for col in range(n_samples):
-            axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
+            if col == 0:
+                axes[0, col].set_ylabel("ID original", fontsize=9, fontweight="bold", color="steelblue")
+                axes[1, col].set_ylabel("ID reconstructed", fontsize=9, fontweight="bold", color="steelblue")
             render_cell(axes[0, col], x_id[col].cpu(), is_image, "steelblue", denorm_fn)
-            axes[1, col].set_ylabel(
-                "ID reconstructed", fontsize=9, fontweight="bold", color="steelblue"
-            )
             render_cell(axes[1, col], x_recon_id[col].cpu(), is_image, "steelblue", denorm_fn)
 
         for col in range(n_samples, n_samples * 2):
             idx = col - n_samples
-            axes[0, col].set_ylabel("OOD original", fontsize=9, fontweight="bold", color="tomato")
             render_cell(axes[0, col], x_ood[idx].cpu(), is_image, "tomato", denorm_fn)
-            axes[1, col].set_ylabel(
-                "OOD reconstructed", fontsize=9, fontweight="bold", color="tomato"
-            )
             render_cell(axes[1, col], x_recon_ood[idx].cpu(), is_image, "tomato", denorm_fn)
+
+        plt.tight_layout()
+
+        # Push OOD columns right to create gap between groups
+        gap = 0.04
+        for row in range(2):
+            for col in range(n_samples, n_cols):
+                pos = axes[row, col].get_position()
+                axes[row, col].set_position([pos.x0 + gap, pos.y0, pos.width, pos.height])
+
+        # Place OOD labels via fig.text so they never clip against the figure edge
+        p0 = axes[0, n_samples].get_position()
+        p1 = axes[1, n_samples].get_position()
+        x_label = p0.x0 - 0.01
+        fig.text(x_label, p0.y0 + p0.height / 2, "OOD original",
+                 va="center", ha="right", rotation=90,
+                 fontsize=9, fontweight="bold", color="tomato")
+        fig.text(x_label, p1.y0 + p1.height / 2, "OOD reconstructed",
+                 va="center", ha="right", rotation=90,
+                 fontsize=9, fontweight="bold", color="tomato")
+        return fig
 
     else:
         fig, axes = plt.subplots(4, n_samples, figsize=(2.0 * n_samples, 2.0 * 4))

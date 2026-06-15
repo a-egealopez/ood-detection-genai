@@ -263,14 +263,16 @@ class BaseDDPMModel(nn.Module, BaseOODModel):
         score_timesteps = self._score_timesteps(device)
         t_keys = [int(t.item()) for t in score_timesteps]
 
-        skip_scores = set(cfg.evaluation.get("skip_scores", []) if cfg else [])
+        eval_cfg = cfg.get("evaluation", {}) if cfg else {}
+        skip_scores = set(eval_cfg.get("skip_scores", []))
         skip_recon_multi = "recon_multi" in skip_scores
+        n_train_ref = int(eval_cfg.get("n_train_ref_samples", float("inf")))
 
         residuals: list[np.ndarray] = []
         mse_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
         cosine_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
         recon_stats_per_t: dict[int, list[float]] = {k: [] for k in t_keys}
-        _MAX_RECON_REF = 512
+        _MAX_RECON_REF = 128
         n_recon_seen = 0
 
         self.eval()
@@ -310,6 +312,8 @@ class BaseDDPMModel(nn.Module, BaseOODModel):
                     recon_stats_per_t[t_key].extend(self._mse_score(traj[0], x_sub).cpu().tolist())
                 n_recon_seen += cap
             n_seen += b
+            if n_seen >= n_train_ref:
+                break
 
         residuals_np = np.concatenate(residuals, axis=0)
         ref = build_latent_reference(residuals_np, knn_k=knn_k, normalize_knn=False, reg=1e-5)

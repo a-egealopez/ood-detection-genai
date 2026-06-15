@@ -322,13 +322,21 @@ def build_dataloaders(cfg: DictConfig) -> dict:
         cfg.data.img_mean = meta.img_mean.tolist()
         cfg.data.img_std = meta.img_std.tolist()
 
-    loader_kwargs = {
-        "batch_size": int(cfg.training.batch_size),
+    train_bs = int(cfg.training.batch_size)
+    eval_cfg = cfg.get("evaluation", {}) if cfg else {}
+    eval_bs  = int(eval_cfg.get("eval_batch_size", train_bs))
+
+    base_kwargs = {
         "num_workers": int(cfg.data.get("num_workers", 0)),
-        "pin_memory": bool(cfg.data.get("pin_memory", False)),
+        "pin_memory":  bool(cfg.data.get("pin_memory", False)),
     }
 
     return {
-        split: DataLoader(datasets[split], shuffle=(split == "train"), **loader_kwargs)
+        split: DataLoader(
+            datasets[split],
+            shuffle=(split == "train"),
+            batch_size=(train_bs if split == "train" else eval_bs),
+            **base_kwargs,
+        )
         for split in ["train", "id_eval", "ood_eval"]
     }

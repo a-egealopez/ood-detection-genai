@@ -57,16 +57,18 @@ _METHOD_DISPLAY = {
 
 # Groups of datasets treated together (one figure + table per group)
 _DATASET_GROUPS = {
+    "toy_blobs_moons": ["blobs", "moons"],
     "mnist": ["mnist"],
-    "sicap": ["sicap_c1", "sicap_c12"],
-    "pathmnist": ["pathmnist_c1", "pathmnist_c2"],
+    "pathmnist_c1_c2": ["pathmnist_c1", "pathmnist_c2"],
+    "sicap_c1_c12": ["sicap_c1", "sicap_c12"],
 }
 
 # Prefix of method names to keep per group; distance methods (knn/mahalanobis) are always kept.
 _GROUP_ARCH_FILTER: dict[str, str | None] = {
+    "toy_blobs_moons": None,
     "mnist": "unet",
-    "pathmnist": "unet",
-    "sicap": "mlp",
+    "pathmnist_c1_c2": "unet",
+    "sicap_c1_c12": "mlp",
 }
 
 
@@ -389,6 +391,9 @@ def run_aggregate_tables(
 
     df["t_steps"] = df["experiment_id"].apply(_parse_t_from_id)
 
+    tables_dir = out / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+
     any_group_found = False
     for group_name, candidate_datasets in _DATASET_GROUPS.items():
         arch_prefix = _GROUP_ARCH_FILTER.get(group_name)
@@ -440,7 +445,7 @@ def run_aggregate_tables(
         )
 
         dist = gdf[gdf["method"].isin(DISTANCE_METHODS) & gdf["dataset"].isin(key_datasets)].copy()
-        _write_tab_comparison_tex(agg, dist, key_datasets, out, suffix=group_name)
+        _write_tab_comparison_tex(agg, dist, key_datasets, tables_dir, suffix=group_name)
         _plot_methods_comparison(
             agg, dist, key_datasets, out, suffix=group_name, group_title=group_name.upper()
         )

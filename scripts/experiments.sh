@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 
 exp_0() {
+    for dataset in $TOY_DATASETS; do
+        for dtype in knn mahalanobis; do
+            run_timed "dist-$dtype/$dataset" \
+                --mode distance-method \
+                --experiment "distance/toy" --dataset "$dataset" \
+                --distance-type "$dtype" --seed "$SEED"
+        done
+    done
+    for dtype in knn mahalanobis; do
+        run_timed "dist-$dtype/mnist" \
+            --mode distance-method \
+            --experiment "distance/mnist" --dataset "mnist" \
+            --distance-type "$dtype" --seed "$SEED"
+    done
     for dataset in $SICAP_DATASETS; do
         for dtype in knn mahalanobis; do
             run_timed "dist-$dtype/$dataset" \
@@ -60,22 +74,23 @@ exp_3_train() {
 exp_3_eval() {
     should_run vae  && run_loop --skip-train "unet/vae/base"  mnist "$SEEDS_UNET_MNIST"       "$LRS_UNET_VAE_MNIST"
     should_run ddpm && run_loop --skip-train "unet/ddpm/base" mnist "$SEEDS_UNET_DDPM_MNIST"  "$LRS_UNET_DDPM_MNIST"
-    should_run ddpm && run_loop --skip-train "unet/ddpm/base" mnist "2024"                    "1e-4"
+    [[ -n "${EXTRA_SEED_DDPM_MNIST:-2024}" ]] && \
+        should_run ddpm && run_loop --skip-train "unet/ddpm/base" mnist "${EXTRA_SEED_DDPM_MNIST:-2024}" "1e-4"
 }
 
 exp_3() { exp_3_train; exp_3_eval; }
 
 exp_4_train() {
     for dataset in $PATH_DATASETS; do
-        should_run vae  && run_loop --skip-eval "unet/vae/base"  "$dataset" "$SEEDS_UNET" "$LRS_UNET_VAE"
-        should_run ddpm && run_loop --skip-eval "unet/ddpm/base" "$dataset" "$SEEDS_UNET" "$LRS_UNET_DDPM"
+        should_run vae  && run_loop --skip-eval "unet/vae/base"  "$dataset" "$SEEDS_UNET"          "$LRS_UNET_VAE"
+        should_run ddpm && run_loop --skip-eval "unet/ddpm/base" "$dataset" "$SEEDS_UNET_DDPM_PATH" "$LRS_UNET_DDPM_PATH"
     done
 }
 
 exp_4_eval() {
     for dataset in $PATH_DATASETS; do
-        should_run vae  && run_loop --skip-train "unet/vae/base"  "$dataset" "$SEEDS_UNET" "$LRS_UNET_VAE"
-        should_run ddpm && run_loop --skip-train "unet/ddpm/base" "$dataset" "$SEEDS_UNET" "$LRS_UNET_DDPM"
+        should_run vae  && run_loop --skip-train "unet/vae/base"  "$dataset" "$SEEDS_UNET"          "$LRS_UNET_VAE"
+        should_run ddpm && run_loop --skip-train "unet/ddpm/base" "$dataset" "$SEEDS_UNET_DDPM_PATH" "$LRS_UNET_DDPM_PATH"
     done
 }
 

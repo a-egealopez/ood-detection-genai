@@ -33,7 +33,7 @@ wandb/
 scripts/copy_results.sh
 scripts/clean.sh
 scripts/entropy_resolution_analysis.py
-scripts/gen_mnist_asset.py
+scripts/gen*
 logs/
 figures/
 !assets/
