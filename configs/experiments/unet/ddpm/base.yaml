@@ -35,7 +35,7 @@ ood:
   knn_k: 1
 
 evaluation:
-  eval_batch_size: 64
+  eval_batch_size: 8
   n_train_ref_samples: 5000
 
 wandb:

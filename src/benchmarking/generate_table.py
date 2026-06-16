@@ -199,11 +199,11 @@ def _bold_if_best(value: str, metric: float, best: float) -> str:
 def _write_tab_comparison_tex(
     agg: pd.DataFrame, dist: pd.DataFrame, datasets: list[str], out: Path, suffix: str
 ) -> None:
-    n_cols = 6
+    n_cols = 5
     lines = [
-        r"\begin{longtable}{lllccc}",
+        r"\begin{longtable}{llccc}",
         r"\toprule",
-        r"Método & LR & Score & AUROC & AUPR & FPR@95\% \\",
+        r"Método & Score & AUROC & AUPR & FPR@95\% \\",
         r"\midrule",
     ]
     for i, dataset in enumerate(datasets):
@@ -221,7 +221,6 @@ def _write_tab_comparison_tex(
             rows_to_write.append(
                 {
                     "method": meth,
-                    "lr": "--",
                     "score": "--",
                     "auroc": float(best["auroc"]),
                     "aupr": float(best["aupr"]),
@@ -236,7 +235,6 @@ def _write_tab_comparison_tex(
             rows_to_write.append(
                 {
                     "method": meth,
-                    "lr": _fmt(b["lr"], "g"),
                     "score": _escape_tex(b["score"]),
                     "auroc": float(b["auroc_mean"]),
                     "aupr": float(b["aupr_mean"]),
@@ -258,7 +256,6 @@ def _write_tab_comparison_tex(
 
             cells = [
                 _escape_tex(_METHOD_DISPLAY.get(row["method"], row["method"])),
-                _escape_tex(row["lr"]),
                 score_cell,
                 _bold_if_best(_fmt(row["auroc"], ".4f"), row["auroc"], best_auroc),
                 _fmt(row["aupr"], ".4f"),
