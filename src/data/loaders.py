@@ -324,11 +324,11 @@ def build_dataloaders(cfg: DictConfig) -> dict:
 
     train_bs = int(cfg.training.batch_size)
     eval_cfg = cfg.get("evaluation", {}) if cfg else {}
-    eval_bs  = int(eval_cfg.get("eval_batch_size", train_bs))
+    eval_bs = int(eval_cfg.get("eval_batch_size", train_bs))
 
     base_kwargs = {
         "num_workers": int(cfg.data.get("num_workers", 0)),
-        "pin_memory":  bool(cfg.data.get("pin_memory", False)),
+        "pin_memory": bool(cfg.data.get("pin_memory", False)),
     }
 
     return {
