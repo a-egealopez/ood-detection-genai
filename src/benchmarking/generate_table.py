@@ -107,7 +107,7 @@ def _tex_meanstd(mean, std, fmt: str = ".4f", fallback: str = "--") -> str:
     if pd.isna(mean):
         return fallback
     s = format(mean, fmt)
-    return f"{s} $\\pm$ {format(std, fmt)}" if not pd.isna(std) and std > 0 else s
+    return f"{s} $\\pm$ {format(std, fmt)}" if not pd.isna(std) else s
 
 
 def _parse_t_from_id(experiment_id: str) -> int | None:
@@ -166,9 +166,6 @@ def _write_tab_results_tex(
             best_auroc = group_data["auroc_mean"].max()
 
             for _, r in group_data.iterrows():
-                if group_name == "DDPM" and (pd.isna(r["auroc_std"]) or pd.isna(r["aupr_std"])):
-                    continue
-
                 auroc_val = r["auroc_mean"]
                 auroc_str = _tex_meanstd(auroc_val, r["auroc_std"])
                 if pd.notna(auroc_val) and auroc_val == best_auroc:
@@ -436,7 +433,7 @@ def run_aggregate_tables(
             suffix=group_name,
             caption=(
                 f"Resultados completos en {ds_label}{arch_note}: AUROC, AUPR y FPR@95\\%"
-                r" (media~$\pm$~desv.\ típica). Mejor AUROC por grupo en negrita."
+                r" (media~$\pm$~desv.\ típica). Mejor AUROC por grupo en \textbf{negrita}."
             ),
             label=f"tab:results_{group_name}_full",
         )

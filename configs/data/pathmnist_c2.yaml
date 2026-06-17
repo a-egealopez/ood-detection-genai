@@ -6,7 +6,7 @@ data:
   root: data/
   id_classes: [0, 3, 4, 5, 6]
   ood_classes: [7, 8]
-  n_train_samples: null
+  n_train_samples: 24000  # ~mitad de las ~47.9k muestras disponibles (5 clases ID), para igualar mejor el coste por época a c1
   n_eval_samples: 1000
   input_dim: ???
   img_size: 224  # 224px needed to flip OOD/ID complexity asymmetry (see entropy analysis)
