@@ -1,0 +1,23 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+title: "Diffusion-based Generative Models for Out-of-Distribution Detection in Medical Images"
+abstract: >
+  Framework for out-of-distribution detection using diffusion models and
+  variational autoencoders, with primary application to computational
+  histopathology and prostate cancer grading.
+authors:
+  - family-names: "Egea López"
+    given-names: "Alejandro"
+    affiliation: "Universidad de Granada"
+    email: "alej.egealopez@gmail.com"
+license: Apache-2.0
+version: "1.0.0"
+date-released: "2026-06-18"
+repository-code: "https://github.com/a-egealopez/ood-detection-genai"
+keywords:
+  - out-of-distribution detection
+  - diffusion models
+  - variational autoencoders
+  - computational histopathology
+  - foundation models
+  - anomaly detection

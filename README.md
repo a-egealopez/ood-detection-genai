@@ -3,6 +3,8 @@
 <p>
   <img src="https://img.shields.io/badge/python-3.10-blue.svg">
   <img src="https://img.shields.io/badge/pytorch-2.0%2B-ee4c2c.svg">
+  <img src="https://img.shields.io/badge/%F0%9F%A4%97%20diffusers-0.27%2B-ffcc00.svg">
+  <img src="https://img.shields.io/badge/MONAI-0.9%2B-00b4d8.svg">
   <img src="https://img.shields.io/badge/license-Apache%202.0-yellowgreen.svg">
 </p>
 
@@ -206,6 +208,30 @@ W&B logging is enabled by default. To disable:
 wandb:
   enabled: false
 ```
+---
+
+## Results
+
+Best score per method on the primary histopathology benchmarks (MLP backbone, averaged over 3 seeds and 3 learning rates). Full tables in [`tables/`](tables/).
+
+**SICAP-C1** — benign (Gleason 1) vs. cancer (Gleason 2–4)
+
+| Method | Score | AUROC | AUPR | FPR@95% |
+|--------|-------|------:|-----:|--------:|
+| KNN | — | 0.6848 | 0.8440 | 0.7735 |
+| Mahalanobis | — | 0.8348 | 0.9291 | 0.6158 |
+| VAE | ELBO | **0.8553** | **0.9406** | **0.5912** |
+| DDPM | residual Mahalanobis | 0.8400 | 0.9246 | 0.6845 |
+
+**SICAP-C12** — benign (Gleason 1–2) vs. cancer (Gleason 3–4)
+
+| Method | Score | AUROC | AUPR | FPR@95% |
+|--------|-------|------:|-----:|--------:|
+| KNN | — | 0.6146 | 0.1989 | 0.7608 |
+| Mahalanobis | — | 0.8545 | 0.5876 | 0.6051 |
+| VAE | ELBO | **0.8640** | **0.5992** | **0.4997** |
+| DDPM | multi-step reconstruction | 0.8557 | 0.5724 | 0.5439 |
+
 ---
 
 ## Notes
