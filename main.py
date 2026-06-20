@@ -133,7 +133,8 @@ def _mode_stats_summary(args):
         # fast/ PathMNIST: VAE s107/s2024 (training) + DDPM retrain + DDPM s42
         # Los *_eval.txt de VAE ya están excluidos; training detection filtra el resto
         *sorted(
-            f for f in Path("logs/fast").glob("log_4_*.txt")
+            f
+            for f in Path("logs/fast").glob("log_4_*.txt")
             if not (f.name.startswith("log_4_vae") and f.name.endswith("_eval.txt"))
         ),
         Path("logs/log_5.txt"),

@@ -80,8 +80,8 @@ def run_training_times(
     else:
         log_files = sorted(Path(log_dir).glob("log_*.txt"))
 
-    last: dict = {}        # (model, dataset, seed_lr) → seconds
-    last_epochs: dict = {} # (model, dataset, seed_lr) → epoch count
+    last: dict = {}  # (model, dataset, seed_lr) → seconds
+    last_epochs: dict = {}  # (model, dataset, seed_lr) → epoch count
 
     for f in log_files:
         if not f.exists():
@@ -102,7 +102,7 @@ def run_training_times(
                 continue
 
             if "Loaded checkpoint:" in line:
-                is_eval_run = True   # eval-only run detected
+                is_eval_run = True  # eval-only run detected
                 pending_stop_epoch = None
                 continue
 
@@ -162,8 +162,7 @@ def run_training_times(
         rows = []
         for ds in datasets:
             cells = [r"\quad " + DATASETS[ds]] + [
-                _fmt_cell(data[(mk, ds)], data_epochs.get((mk, ds)))
-                if (mk, ds) in data else "---"
+                _fmt_cell(data[(mk, ds)], data_epochs.get((mk, ds))) if (mk, ds) in data else "---"
                 for mk in models
             ]
             if any(c != "---" for c in cells[1:]):
