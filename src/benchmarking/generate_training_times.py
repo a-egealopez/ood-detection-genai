@@ -29,6 +29,8 @@ GROUPS = [
 _TIME_RE = re.compile(r"\[time\]\s+(\S+)\s+->\s+(\d+):(\d+):(\d+)")
 _EPOCHS_RE = re.compile(r"epochs\s*:\s*(\d+)")
 _EARLY_STOP_RE = re.compile(r"Early stopping at epoch (\d+)")
+_EPOCHS_RE = re.compile(r"epochs\s*:\s*(\d+)")
+_EARLY_STOP_RE = re.compile(r"Early stopping at epoch (\d+)")
 
 
 def _fmt(s):
@@ -38,6 +40,13 @@ def _fmt(s):
     if m:
         return f"{m}\\,m\\,{s:02d}\\,s"
     return f"{s}\\,s"
+
+
+def _fmt_cell(secs: int, epochs: int | None) -> str:
+    t = _fmt(secs)
+    if epochs is not None:
+        return rf"{t}\,({epochs})"
+    return t
 
 
 def _fmt_cell(secs: int, epochs: int | None) -> str:
@@ -60,7 +69,22 @@ def run_training_times(
     log_dir: Path | str | list[Path | str] = "logs",
     out_dir: Path | str = "results/summary",
     file_model_filter: dict[str, set] | None = None,
+    log_dir: Path | str | list[Path | str] = "logs",
+    out_dir: Path | str = "results/summary",
+    file_model_filter: dict[str, set] | None = None,
 ) -> Path:
+    """Parse training-time logs and emit a LaTeX tabular with avg time and epochs.
+
+    Distinguishes training runs from eval-only runs:
+      - Training:  line matching ``epochs : N`` sets the training flag.
+      - Eval-only: line containing ``Loaded checkpoint:`` clears the flag.
+    Only [time] entries reached during a training run are recorded.
+    Epoch count is the early-stopping epoch when triggered, else the
+    configured max-epochs for that run.
+
+    file_model_filter: restrict accepted model keys per file path
+                       (e.g. to extract only VAE entries from a mixed file).
+    """
     """Parse training-time logs and emit a LaTeX tabular with avg time and epochs.
 
     Distinguishes training runs from eval-only runs:
@@ -124,16 +148,33 @@ def run_training_times(
             if skip:
                 continue
 
+
+            # Snapshot and reset per-run state
+            epoch = pending_stop_epoch if pending_stop_epoch is not None else current_max_epochs
+            pending_stop_epoch = None
+            skip = is_eval_run
+            is_eval_run = False  # reset: next run unknown until a marker appears
+
+            if skip:
+                continue
+
             parsed = _parse(m.group(1))
             if parsed is None:
                 continue
             model, dataset, seed_lr = parsed
             if allowed is not None and model not in allowed:
                 continue
+            if allowed is not None and model not in allowed:
+                continue
             if dataset not in DATASETS or model not in MODELS:
                 continue
 
+
             secs = int(m.group(2)) * 3600 + int(m.group(3)) * 60 + int(m.group(4))
+            key = (model, dataset, seed_lr)
+            last[key] = secs
+            if epoch is not None:
+                last_epochs[key] = epoch
             key = (model, dataset, seed_lr)
             last[key] = secs
             if epoch is not None:
@@ -143,6 +184,11 @@ def run_training_times(
     for (model, dataset, _), secs in last.items():
         agg[(model, dataset)].append(secs)
     data = {k: int(statistics.mean(v)) for k, v in agg.items()}
+
+    agg_ep: dict = defaultdict(list)
+    for (model, dataset, _), ep in last_epochs.items():
+        agg_ep[(model, dataset)].append(ep)
+    data_epochs = {k: int(round(statistics.mean(v))) for k, v in agg_ep.items()}
 
     agg_ep: dict = defaultdict(list)
     for (model, dataset, _), ep in last_epochs.items():
