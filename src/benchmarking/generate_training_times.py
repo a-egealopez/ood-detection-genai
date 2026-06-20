@@ -69,34 +69,7 @@ def run_training_times(
     log_dir: Path | str | list[Path | str] = "logs",
     out_dir: Path | str = "results/summary",
     file_model_filter: dict[str, set] | None = None,
-    log_dir: Path | str | list[Path | str] = "logs",
-    out_dir: Path | str = "results/summary",
-    file_model_filter: dict[str, set] | None = None,
 ) -> Path:
-    """Parse training-time logs and emit a LaTeX tabular with avg time and epochs.
-
-    Distinguishes training runs from eval-only runs:
-      - Training:  line matching ``epochs : N`` sets the training flag.
-      - Eval-only: line containing ``Loaded checkpoint:`` clears the flag.
-    Only [time] entries reached during a training run are recorded.
-    Epoch count is the early-stopping epoch when triggered, else the
-    configured max-epochs for that run.
-
-    file_model_filter: restrict accepted model keys per file path
-                       (e.g. to extract only VAE entries from a mixed file).
-    """
-    """Parse training-time logs and emit a LaTeX tabular with avg time and epochs.
-
-    Distinguishes training runs from eval-only runs:
-      - Training:  line matching ``epochs : N`` sets the training flag.
-      - Eval-only: line containing ``Loaded checkpoint:`` clears the flag.
-    Only [time] entries reached during a training run are recorded.
-    Epoch count is the early-stopping epoch when triggered, else the
-    configured max-epochs for that run.
-
-    file_model_filter: restrict accepted model keys per file path
-                       (e.g. to extract only VAE entries from a mixed file).
-    """
     out_dir = Path(out_dir)
 
     if isinstance(log_dir, (list, tuple)):
@@ -111,9 +84,7 @@ def run_training_times(
         if not f.exists():
             continue
         allowed = file_model_filter.get(str(f)) if file_model_filter else None
-        # is_eval_run: flipped to True only when "Loaded checkpoint:" appears
-        # (indicating an eval-only run). KNN/MLP reruns without "epochs :" are
-        # treated as training because they never emit "Loaded checkpoint:".
+
         is_eval_run = False
         current_max_epochs: int | None = None
         pending_stop_epoch: int | None = None
@@ -148,7 +119,6 @@ def run_training_times(
             if skip:
                 continue
 
-
             # Snapshot and reset per-run state
             epoch = pending_stop_epoch if pending_stop_epoch is not None else current_max_epochs
             pending_stop_epoch = None
@@ -168,7 +138,6 @@ def run_training_times(
                 continue
             if dataset not in DATASETS or model not in MODELS:
                 continue
-
 
             secs = int(m.group(2)) * 3600 + int(m.group(3)) * 60 + int(m.group(4))
             key = (model, dataset, seed_lr)
