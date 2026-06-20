@@ -22,10 +22,6 @@ if TYPE_CHECKING:
     from src.evaluation.extract import ScoreBundle
 
 
-def _apply_suptitle(fig: plt.Figure, title: str, rect_bottom: float = 0.0) -> None:
-    fig.tight_layout()
-
-
 def render_cell(
     ax: plt.Axes,
     tensor: torch.Tensor,

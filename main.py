@@ -62,7 +62,6 @@ def _parse_args():
             "sicap_c12",
             "moons",
             "blobs",
-            "pathmnist",
             "pathmnist_c1",
             "pathmnist_c2",
         ],
@@ -120,7 +119,26 @@ def _mode_stats_summary(args):
     out_dir = str(Path(out_csv).parent)
     run_aggregate_tables(csv_path=out_csv, out_dir=out_dir)
     run_t_ablation(csv_path=out_csv, out_dir=out_dir)
-    run_training_times(out_dir=out_dir)
+    _log_files = [
+        # VAE+DDPM MNIST con arquitectura antigua (training detection filtra eval)
+        Path("logs/log_3.txt"),
+        Path("logs/fast/log_0.txt"),
+        Path("logs/log_1.txt"),
+        Path("logs/log_2.txt"),
+        # fast/log_3_* son eval-only: training detection los descarta automáticamente
+        *sorted(Path("logs/fast").glob("log_3_*.txt")),
+        # VAE PathMNIST s42 (training detection filtra las entradas eval-only del final)
+        Path("logs/log_4_vae_c1.txt"),
+        Path("logs/log_4_vae_c2.txt"),
+        # fast/ PathMNIST: VAE s107/s2024 (training) + DDPM retrain + DDPM s42
+        # Los *_eval.txt de VAE ya están excluidos; training detection filtra el resto
+        *sorted(
+            f for f in Path("logs/fast").glob("log_4_*.txt")
+            if not (f.name.startswith("log_4_vae") and f.name.endswith("_eval.txt"))
+        ),
+        Path("logs/log_5.txt"),
+    ]
+    run_training_times(log_dir=_log_files, out_dir=out_dir)
 
 
 def _mode_distance_method(args):

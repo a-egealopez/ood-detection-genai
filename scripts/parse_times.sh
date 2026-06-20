@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
-logs="${*:-logs/log_*.txt}"
+# exp0: fast/ (completo: toy+mnist+sicap+pathmnist con config actual)
+# exp1, exp2, exp5: logs/ root (MLP toy/mnist/sicap, no han cambiado)
+# exp3, exp4: fast/ (UNet mnist y pathmnist reentrenados con arquitectura actual)
+# log_4_vae*_eval.txt excluidos: son runs eval-only (~20 min), sobrescriben los tiempos de training reales
+_log4_files=$(ls logs/fast/log_4_*.txt 2>/dev/null | grep -v "log_4_vae.*_eval\.txt")
+logs="${*:-logs/fast/log_0.txt logs/log_1.txt logs/log_2.txt logs/fast/log_3_*.txt $_log4_files logs/log_5.txt}"
 
 for log in $logs; do
     [[ -f "$log" ]] || continue
