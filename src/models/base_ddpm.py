@@ -141,7 +141,7 @@ class BaseDDPMModel(nn.Module, BaseOODModel):
     def _cosine_dist(self, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         a_vec = a.reshape(a.shape[0], -1)
         b_vec = b.reshape(b.shape[0], -1)
-        cos_sim = (a_vec * b_vec).sum(1) / (a_vec.norm(1) * b_vec.norm(1) + 1e-12)
+        cos_sim = (a_vec * b_vec).sum(1) / (a_vec.norm(dim=1) * b_vec.norm(dim=1) + 1e-12)
         return 1.0 - cos_sim
 
     def _extract_pred_noise(
