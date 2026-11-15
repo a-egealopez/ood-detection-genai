@@ -1,4 +1,4 @@
-# OOD Detection with Generative Models
+# Generative AI for Out-of-Distribution Detection in Histopathology
 
 <p>
   <img src="https://img.shields.io/badge/python-3.10-blue.svg">
@@ -8,15 +8,36 @@
   <img src="https://img.shields.io/badge/license-Apache%202.0-yellowgreen.svg">
 </p>
 
-Framework for **out-of-distribution (OOD) detection** using generative models. Compares reconstruction-based methods (VAE, DDPM) with distance-based baselines (KNN, Mahalanobis) across multiple datasets and scoring strategies.
+**Bachelor's thesis, Universidad de Granada, 2026 · Graded with Honours (10/10) · [Read the thesis (PDF)](EGEA_LOPEZ_ALEJANDRO-TFG_2025-26_OOD-DETECTION-GENAI.pdf)**
 
-OOD detection asks whether a test sample comes from the same distribution the model was trained on. Here, generative models are trained exclusively on in-distribution data and used at inference time to score samples — without any OOD examples during training. The primary application is histopathology: detecting high-grade prostate cancer (Gleason 3–4) as OOD with respect to a model trained on benign tissue (Gleason 1–2).
+Can a model trained only on benign prostate tissue tell when it is shown cancer? This project trains generative models (VAEs and DDPM diffusion models) exclusively on in-distribution data and uses them to score new samples as in- or out-of-distribution, without seeing a single OOD example during training. It compares them with distance-based baselines (KNN, Mahalanobis) across datasets, backbones and scoring strategies.
 
-| DDPM denoising trajectory (UNet · MNIST) | DDPM denoising trajectory (UNet · PathMNIST-C2) |
-|:---:|:---:|
+
+|                   DDPM denoising trajectory (UNet · MNIST)                   |                    DDPM denoising trajectory (UNet · PathMNIST-C2)                    |
+| :------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------: |
 | ![DDPM denoising trajectory MNIST](assets/ddpm_denoising_trajectory_mnist.png) | ![DDPM denoising trajectory PathMNIST](assets/ddpm_denoising_trajectory_pathmnist.png) |
 
-Developed as a Bachelor's thesis — Universidad de Granada, 2026.
+## Key findings
+
+On SICAP, benign (Gleason 1–2) vs. cancer (Gleason 3–4), MLP backbone, averaged over 3 seeds and 3 learning rates:
+
+
+| Method      | Best score                |      AUROC |       AUPR |    FPR@95% |
+| ------------- | --------------------------- | -----------: | -----------: | -----------: |
+| KNN         | —                        |     0.6146 |     0.1989 |     0.7608 |
+| Mahalanobis | —                        |     0.8545 |     0.5876 |     0.6051 |
+| VAE         | ELBO                      | **0.8640** | **0.5992** | **0.4997** |
+| DDPM        | multi-step reconstruction |     0.8557 |     0.5724 |     0.5439 |
+
+- **The VAE scored with the ELBO is the best method** on both SICAP benchmarks (AUROC 0.864 here, 0.855 on SICAP-C1), and it has the lowest false-positive rate at 95% recall.
+- **A simple Mahalanobis baseline comes within 0.01–0.02 AUROC** of the generative models with no training at all, while the UNet DDPM experiments take 20–40 GPU hours each. The extra cost of generative models has to be justified case by case.
+- **How you score matters as much as which model you use:** each model was evaluated with several scoring modes (reconstruction, ELBO, latent distances, noise residuals), and results change notably between them.
+
+![DDPM OOD score distribution and ROC curve](assets/ddpm_ood_score_noise_multi_mse.png)
+
+*DDPM scored with the multi-timestep noise error (`noise_multi_mse`): in-distribution and OOD samples fall into clearly separated score distributions (left), giving an AUROC of 0.84 (right).*
+
+More results, ablations and the full discussion are in the [thesis](EGEA_LOPEZ_ALEJANDRO-TFG_2025-26_OOD-DETECTION-GENAI.pdf).
 
 ---
 
@@ -84,7 +105,7 @@ python main.py \
   --skip-train
 ```
 
-Supported experiments: `mlp/vae/sicap`, `mlp/ddpm/sicap`, `mlp/vae/path`, `mlp/ddpm/path`, `mlp/ddpm/mnist`, `mlp/vae/toy`, `mlp/ddpm/toy`, `unet/vae/base`, `unet/ddpm/base`.  
+Supported experiments: `mlp/vae/sicap`, `mlp/ddpm/sicap`, `mlp/vae/path`, `mlp/ddpm/path`, `mlp/ddpm/mnist`, `mlp/vae/toy`, `mlp/ddpm/toy`, `unet/vae/base`, `unet/ddpm/base`.
 Supported datasets: `mnist`, `sicap_c1`, `sicap_c12`, `pathmnist_c1`, `pathmnist_c2`, `moons`, `blobs`.
 
 ### Distance-based baselines
@@ -141,15 +162,16 @@ bash scripts/run.sh 0
 SUMMARIZE=1 bash scripts/run.sh
 ```
 
-| Group | Content | Purpose |
-|-------|---------|---------|
-| `exp_0` | KNN + Mahalanobis baselines on SICAP | Distance-based reference, no training required |
-| `exp_1` | MLP VAE + DDPM on toy datasets (moons, blobs) | Sanity check on controlled 2D data |
-| `exp_2` | MLP VAE + DDPM on MNIST and PathMNIST-C1 | Benchmark on standard and histopathology images |
-| `exp_3` | UNet VAE + DDPM on MNIST | Convolutional backbone on standard image data |
-| `exp_4` | UNet VAE + DDPM on PathMNIST (C1, C2) | Convolutional backbone on histopathology images |
-| `exp_5` | MLP VAE + DDPM on SICAP (multi-seed, multi-LR) | Main evaluation, results averaged across seeds |
-| `exp_6` | DDPM T-step ablation on SICAP and PathMNIST | Sensitivity of noise-based scores to number of steps |
+
+| Group   | Content                                        | Purpose                                              |
+| --------- | ------------------------------------------------ | ------------------------------------------------------ |
+| `exp_0` | KNN + Mahalanobis baselines on SICAP           | Distance-based reference, no training required       |
+| `exp_1` | MLP VAE + DDPM on toy datasets (moons, blobs)  | Sanity check on controlled 2D data                   |
+| `exp_2` | MLP VAE + DDPM on MNIST and PathMNIST-C1       | Benchmark on standard and histopathology images      |
+| `exp_3` | UNet VAE + DDPM on MNIST                       | Convolutional backbone on standard image data        |
+| `exp_4` | UNet VAE + DDPM on PathMNIST (C1, C2)          | Convolutional backbone on histopathology images      |
+| `exp_5` | MLP VAE + DDPM on SICAP (multi-seed, multi-LR) | Main evaluation, results averaged across seeds       |
+| `exp_6` | DDPM T-step ablation on SICAP and PathMNIST    | Sensitivity of noise-based scores to number of steps |
 
 Override defaults with environment variables:
 
@@ -163,24 +185,26 @@ SEEDS="42 107 2024" LRS_VAE="1e-4 5e-4" MODEL=vae bash scripts/run.sh 4
 
 ### VAE
 
-| Mode | Description |
-|------|-------------|
-| `recon` | Per-sample MSE reconstruction error |
-| `elbo` | Reconstruction + β · KL divergence |
+
+| Mode         | Description                                        |
+| -------------- | ---------------------------------------------------- |
+| `recon`      | Per-sample MSE reconstruction error                |
+| `elbo`       | Reconstruction + β · KL divergence               |
 | `latent_knn` | Distance to k-th nearest neighbour in latent space |
-| `latent_mah` | Mahalanobis distance in latent space |
+| `latent_mah` | Mahalanobis distance in latent space               |
 
 ### DDPM
 
-| Mode | Description |
-|------|-------------|
-| `noise_single` | MSE between predicted and actual noise at a fixed timestep |
-| `noise_multi_mse` | Z-scored MSE aggregated over multiple timesteps |
+
+| Mode                 | Description                                                 |
+| ---------------------- | ------------------------------------------------------------- |
+| `noise_single`       | MSE between predicted and actual noise at a fixed timestep  |
+| `noise_multi_mse`    | Z-scored MSE aggregated over multiple timesteps             |
 | `noise_multi_cosine` | Z-scored cosine distance aggregated over multiple timesteps |
-| `recon_single` | Reconstruction error after single-step denoising |
-| `recon_multi` | Reconstruction error averaged over multiple denoising steps |
-| `residual_mah` | Mahalanobis distance in the noise-residual space |
-| `residual_knn` | KNN distance in the noise-residual space |
+| `recon_single`       | Reconstruction error after single-step denoising            |
+| `recon_multi`        | Reconstruction error averaged over multiple denoising steps |
+| `residual_mah`       | Mahalanobis distance in the noise-residual space            |
+| `residual_knn`       | KNN distance in the noise-residual space                    |
 
 ---
 
@@ -208,36 +232,12 @@ W&B logging is enabled by default. To disable:
 wandb:
   enabled: false
 ```
----
-
-## Results
-
-Best score per method on the primary histopathology benchmarks (MLP backbone, averaged over 3 seeds and 3 learning rates). Full tables in [`tables/`](tables/).
-
-**SICAP-C1** — benign (Gleason 1) vs. cancer (Gleason 2–4)
-
-| Method | Score | AUROC | AUPR | FPR@95% |
-|--------|-------|------:|-----:|--------:|
-| KNN | — | 0.6848 | 0.8440 | 0.7735 |
-| Mahalanobis | — | 0.8348 | 0.9291 | 0.6158 |
-| VAE | ELBO | **0.8553** | **0.9406** | **0.5912** |
-| DDPM | residual Mahalanobis | 0.8400 | 0.9246 | 0.6845 |
-
-**SICAP-C12** — benign (Gleason 1–2) vs. cancer (Gleason 3–4)
-
-| Method | Score | AUROC | AUPR | FPR@95% |
-|--------|-------|------:|-----:|--------:|
-| KNN | — | 0.6146 | 0.1989 | 0.7608 |
-| Mahalanobis | — | 0.8545 | 0.5876 | 0.6051 |
-| VAE | ELBO | **0.8640** | **0.5992** | **0.4997** |
-| DDPM | multi-step reconstruction | 0.8557 | 0.5724 | 0.5439 |
 
 ---
 
 ## Notes
 
-This repository reflects the academic release of the thesis codebase.
-It does not include a test suite.
+This repository is the academic release of the thesis codebase. Code style and linting are enforced in CI (see `.github/workflows/lint.yml`).
 
 ---
 
