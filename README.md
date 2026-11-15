@@ -206,6 +206,10 @@ SEEDS="42 107 2024" LRS_VAE="1e-4 5e-4" MODEL=vae bash scripts/run.sh 4
 | `residual_mah`       | Mahalanobis distance in the noise-residual space            |
 | `residual_knn`       | KNN distance in the noise-residual space                    |
 
+![DDPM multi-step reconstruction](assets/ddpm_multistep_reconstruction.png)
+
+*Multi-step reconstruction: each sample is noised up to timestep t (left, blue) and denoised back (right, red). With little noise the model recovers the original digit; with more noise it drifts towards what it has learned, and the 7 ends up as a 3. Reconstruction-based scores measure exactly this gap between the input and its reconstruction.*
+
 ---
 
 ## Configuration
